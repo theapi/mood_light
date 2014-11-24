@@ -46,20 +46,22 @@ void loop(void)
   
   // Check for a message from the controller
   if (radio.available()) {
-    int got_val;       // Variable for the received timestamp
-    unsigned long time = micros();
-    //while (radio.available()) {                      // While there is data ready
-      radio.read( &got_val, sizeof(int) );             // Get the payload
-    //} 
-    radio.stopListening();  
-    radio.writeFast( &time, sizeof(unsigned long) );
-    
-    pinMode(PIN, OUTPUT);
-    rainbow(100);
-    strip.setPixelColor(0, 0, 0, 0); // Off (only one NeoPixel)
-    strip.show();
-    pinMode(PIN, INPUT);
-    
+    radio.stopListening();
+    int got_val;       // Variable for the received timestamp                   
+    radio.read( &got_val, sizeof(int) );    // Get the payload
+      
+    if (got_val > 0) {
+      
+      radio.powerDown();
+      
+      pinMode(PIN, OUTPUT);
+      rainbow(100);
+      strip.setPixelColor(0, 0, 0, 0); // Off (only one NeoPixel)
+      strip.show();
+      pinMode(PIN, INPUT);
+      
+      radio.powerUp();
+    }
     radio.startListening();
   }
 }
