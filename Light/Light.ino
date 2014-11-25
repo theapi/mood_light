@@ -1,28 +1,25 @@
 /*
     ** Hardware configuration **
-    ATtiny25/45/85 Pin map with CE_PIN 3 and CSN_PIN 4
+    ATtiny25/45/85 Pin map
                                  +-\/-+
-                   NC      PB5  1|o   |8  Vcc --- nRF24L01  VCC, pin2 --- LED --- 5V
-    nRF24L01  CE, pin3 --- PB3  2|    |7  PB2 --- nRF24L01  SCK, pin5
+                   NC      PB5  1|o   |8  Vcc --- nRF24L01  VCC, pin2
+             NEO_PIXEL --- PB3  2|    |7  PB2 --- nRF24L01  SCK, pin5
     nRF24L01 CSN, pin4 --- PB4  3|    |6  PB1 --- nRF24L01 MOSI, pin7
     nRF24L01 GND, pin1 --- GND  4|    |5  PB0 --- nRF24L01 MISO, pin6
                                  +----+
+    nRF24L01 CE, pin3 -- VCC
 
 */
 
-// CE and CSN are configurable, specified values for ATtiny85 as connected above
-#define CE_PIN 7 // Fake pin as CE is tied high to always be a primary receiver.
-#define CSN_PIN 4
-
+#include "RF24.h"
 #include <Adafruit_NeoPixel.h>
 
-#define PIN 0
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIN, NEO_GRB + NEO_KHZ800);
+#define PIN_CSN 4
+#define PIN_CE  9 // Fake pin as CE is tied high to always be a primary receiver.
+#define PIN_NEO 3
 
-
-#include "RF24.h"
-
-RF24 radio(CE_PIN, CSN_PIN);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIN_NEO, NEO_GRB + NEO_KHZ800);
+RF24 radio(PIN_CE, PIN_CSN);
 
 byte addresses[][6] = {"1Node","2Node"};
 
@@ -47,23 +44,14 @@ void loop(void)
   
   // Check for a message from the controller
   if (radio.available()) {
-    radio.stopListening();
-    int got_val;       // Variable for the received timestamp                   
-    radio.read( &got_val, sizeof(int) );    // Get the payload
+    // Get the payload
+    int got_val;                   
+    radio.read( &got_val, sizeof(int) );    
       
     if (got_val > 0) {
-      
-      radio.powerDown();
-      
-      pinMode(PIN, OUTPUT);
-      rainbow(100);
-      strip.setPixelColor(0, 0, 0, 0); // Off (only one NeoPixel)
-      strip.show();
-      pinMode(PIN, INPUT);
-      
-      radio.powerUp();
+      // Do something...
+      rainbow(10);
     }
-    radio.startListening();
   }
 }
 
@@ -75,7 +63,7 @@ void rainbow(uint8_t wait) {
       strip.setPixelColor(i, Wheel((i+j) & 255));
     }
     strip.show();
-    delay(wait);
+    delay(wait); // @todo remove the delay.
   }
 }
 
