@@ -23,6 +23,9 @@ RF24 radio(PIN_CE, PIN_CSN);
 
 byte addresses[][6] = {"1Node","2Node"};
 
+byte wheel_pos; // the current colour wheel position 
+
+
 void setup() 
 {
   strip.begin();
@@ -45,13 +48,61 @@ void loop(void)
   // Check for a message from the controller
   if (radio.available()) {
     // Get the payload
-    int got_val;                   
+    int got_val;                 
     radio.read( &got_val, sizeof(int) );    
       
     if (got_val > 0) {
       // Do something...
-      rainbow(10);
+      handleMessage(got_val);
     }
+  }
+}
+
+void handleMessage(int got_val)
+{ 
+  // NB one pixel for now
+  uint16_t i = 0;
+
+  switch(got_val) {
+    case 48: // 0
+    case 99: // C- (c)
+      strip.setPixelColor(i, 0, 0, 0);
+      strip.show();
+      break;
+    case 67: // C+ (C)
+      strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+      strip.show();
+      break;
+    case 49:
+      rainbow(5);
+      break;
+    case 45: // -
+      strip.setPixelColor(i, Wheel((wheel_pos--) & 255));
+      strip.show();
+      break;
+    case 43: // +
+      strip.setPixelColor(i, Wheel((wheel_pos++) & 255));
+      strip.show();
+      break;
+    case 70: // FF (f)
+      wheel_pos+=10;
+      strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+      strip.show();
+      break;
+    case 82: // RW (R)
+      wheel_pos-=10;
+      strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+      strip.show();
+      break;
+    case 57: // 9
+      rainbow(250);
+      break;
+      
+    // @todo A bunch of predifined effects...
+      
+    default:
+      // do nothing
+      break;
   }
 }
 
