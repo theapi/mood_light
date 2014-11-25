@@ -57,7 +57,7 @@ void loop(void)
 
     // look for the newline.
     if (Serial.read() == '\n') {
-      radio.write( &send_val, sizeof(int) );
+      if (!radio.write( &send_val, sizeof(int) )){  printf("failed.\n\r");  }
       printf(" sent %d\n\r", send_val);     
     }
   }
