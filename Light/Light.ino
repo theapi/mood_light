@@ -11,7 +11,7 @@
 */
 
 // CE and CSN are configurable, specified values for ATtiny85 as connected above
-#define CE_PIN 3
+#define CE_PIN 7 // Fake pin as CE is tied high to always be a primary receiver.
 #define CSN_PIN 4
 
 #include <Adafruit_NeoPixel.h>
