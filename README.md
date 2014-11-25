@@ -5,7 +5,7 @@ Wireless remote controlled light, using NeoPixel &amp; Nrf24L01-2.4GHz
 
 Hardware
 --------
-Attiny85
+Attiny85 8mhz 3.3v
 
 Nrf24L01-2.4GHz wireless radio transceiver http://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo
 
