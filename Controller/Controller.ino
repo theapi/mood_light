@@ -34,6 +34,7 @@ void setup()
 
   // Setup and configure rf radio
   radio.begin();                          // Start up the radio
+  radio.setPayloadSize(2);                // Only two byte payload gets sent (int)
   radio.setAutoAck(1);                    // Ensure autoACK is enabled
   radio.setRetries(15,15);                // Max delay between retries & number of retries
   radio.openWritingPipe(addresses[0]);
