@@ -15,6 +15,10 @@ http://www.linuxhowtos.org/C_C++/socket.htm
 #include <netinet/in.h>
 #include <signal.h>
 
+#include <arduPi.h>
+
+//  g++ -lrt -lpthread  -I/home/pi/arduPi /home/pi/arduPi/arduPi.cpp src/server/server.cpp -o server
+
 void dostuff(int); /* function prototype */
 int communicate(int);
 void error(const char *msg)
@@ -78,19 +82,10 @@ void dostuff (int sock)
 
    while (communicate(sock)) {
       // todo: implement socket still connect check (write() occasionally)
+
+      // todo: close open sockets on ctl C (if possible) to stop:
+      // "ERROR on binding: Address already in use"
    }
-
-
-   /*
-   char buffer[256];
-
-   bzero(buffer,256);
-   n = read(sock,buffer,255);
-   if (n < 0) error("ERROR reading from socket");
-   printf("Here is the message: %s\n",buffer);
-   n = write(sock,"I got your message",18);
-   if (n < 0) error("ERROR writing to socket");
-   */
 }
 
 int communicate (int sock)
@@ -104,8 +99,16 @@ int communicate (int sock)
        error("ERROR reading from socket");
        return 0;
    }
-   printf("Here is the message: %s\n",buffer);
-   n = write(sock,"I got your message",18);
+
+   // Send bye to close the connection
+   char *pos = strstr(buffer, "bye");
+   if (pos - buffer == 0) {
+	   printf("Sent: bye\n");
+	   return 0;
+   }
+   
+   printf("Got: %s",buffer);
+   n = write(sock,"OK",2);
    if (n < 0) {
        error("ERROR writing to socket");
        return 0;
