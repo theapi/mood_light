@@ -19,11 +19,7 @@ http://www.linuxhowtos.org/C_C++/socket.htm
 //  g++ -lrt -lpthread  -I/home/pi/arduPi /home/pi/arduPi/arduPi.cpp src/server/server.cpp -o server
 
 /**
- * Example RF Radio Ping Pair
- *
- * This is an example of how to use the RF24 class on RPi, communicating to an Arduino running
- * the GettingStarted sketch.
- * 
+ * Adapted from
  * https://github.com/TMRh20/RF24/blob/master/examples_RPi/gettingstarted.cpp
  */
 // RF24
@@ -32,9 +28,6 @@ http://www.linuxhowtos.org/C_C++/socket.htm
 #include <sstream>
 #include <string>
 #include <RF24/RF24.h>
-// g++ -lrt -lpthread src/server/server.cpp -o server
-
-
 
 
 using namespace std;
@@ -104,6 +97,8 @@ int main(int argc, char *argv[])
 
   // Setup and configure rf radio
   radio.begin();
+  // 2 byte payload
+  radio.setPayloadSize(2);
   // Ensure autoACK is enabled
   radio.setAutoAck(1);                    
   // optionally, increase the delay between retries & # of retries
@@ -162,6 +157,7 @@ void dostuff (int sock)
 
 int communicate (int sock)
 {
+	
    int n;
    char buffer[256];
 
@@ -175,25 +171,44 @@ int communicate (int sock)
    // Send bye to close the connection
    char *pos = strstr(buffer, "bye");
    if (pos - buffer == 0) {
-	   printf("Sent: bye\n");
+	   printf("Got: bye\n");
 	   return 0;
    }
    
    printf("Got: %s",buffer);
-   n = write(sock,"OK",2);
-   if (n < 0) {
-       error("ERROR writing to socket");
-       return 0;
-   }
    
-	//RF24
- 
-	// Take the time, and send it.  This will block until complete
-	printf("RF24...\n");
-	unsigned long time = millis();
-	bool ok = radio.write( &time, sizeof(unsigned long) );
-	if (!ok){
-		printf("failed.\n");
+   	// Take the input as an int, 
+	// chop it to a short (2 bytes).
+	// So maximum code number is 32767 (int on 16bit arduino)
+	short code = atoi(buffer);
+	// Response codes are http status codes.
+	if (code > 0) {
+		// Got a valid code
+		n = write(sock, "200", 3);
+	} else {
+		// Bad request
+		char *pos = strstr(buffer, "coffee");
+	    if (pos - buffer == 0) {
+			// http://www.ietf.org/rfc/rfc2324.txt "I'm a teapot" :-)
+		    n = write(sock, "418", 3);
+	    } else {
+			n = write(sock, "400", 3);
+		}
+	}
+    if (n < 0) {
+        error("ERROR writing to socket");
+        return 0;
+    }
+
+	if (code > 0) {
+		// Send it to the arduino via the nRF24L01+.
+		printf("RF24 -> %hd\n", code);
+		bool ok = radio.write( &code, 2 );
+		if (!ok){
+			printf("  failed.\n");
+		}
+    } else {
+		printf("  ignored, not a number.\n");
 	}
 
    return 1;
