@@ -1,4 +1,4 @@
-mood_light
+Mood Light
 ==========
 
 http://theapi.github.io/mood_light/
