@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Mood light : Wireless remote controlled light, using Neopixel &amp; Nrf24L01-2.4GHz">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Mood light</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/theapi/mood_light">View on GitHub</a>
+
+          <h1 id="project_title">Mood light</h1>
+          <h2 id="project_tagline">Wireless remote controlled light, using Neopixel &amp; Nrf24L01-2.4GHz</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/theapi/mood_light/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/theapi/mood_light/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a id="mood-light-" class="anchor" href="#mood-light-" aria-hidden="true"><span class="octicon octicon-link"></span></a>Mood Light </h1>
+
+<p>Wireless remote controlled light, using NeoPixel &amp; Nrf24L01-2.4GHz</p>
+
+<h2>
+<a id="hardware" class="anchor" href="#hardware" aria-hidden="true"><span class="octicon octicon-link"></span></a>Hardware</h2>
+
+<p>Raspberry Pi</p>
+
+<p>Attiny85 8mhz 3.3v</p>
+
+<p>Nrf24L01-2.4GHz wireless radio transceiver <a href="http://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo">http://arduino-info.wikispaces.com/Nrf24L01-2.4GHz-HowTo</a></p>
+
+<p>NeoPixel <a href="https://learn.adafruit.com/adafruit-neopixel-uberguide/overview">https://learn.adafruit.com/adafruit-neopixel-uberguide/overview</a></p>
+
+<h2>
+<a id="software" class="anchor" href="#software" aria-hidden="true"><span class="octicon octicon-link"></span></a>Software</h2>
+
+<p>RF24 library <a href="https://github.com/TMRh20/RF24">https://github.com/TMRh20/RF24</a></p>
+
+<p>NeoPixel library <a href="https://github.com/adafruit/Adafruit_NeoPixel">https://github.com/adafruit/Adafruit_NeoPixel</a></p>
+
+<h2>
+<a id="setup" class="anchor" href="#setup" aria-hidden="true"><span class="octicon octicon-link"></span></a>Setup</h2>
+
+<p>All pins are used as described in Light.ino</p>
+
+<pre><code>ATtiny25/45/85 Pin map
+                             +-\/-+
+               NC      PB5  1|o   |8  Vcc --- nRF24L01  VCC, pin2
+         NEO_PIXEL --- PB3  2|    |7  PB2 --- nRF24L01  SCK, pin5
+nRF24L01 CSN, pin4 --- PB4  3|    |6  PB1 --- nRF24L01 MOSI, pin7
+nRF24L01 GND, pin1 --- GND  4|    |5  PB0 --- nRF24L01 MISO, pin6
+                             +----+
+nRF24L01 CE, pin3 -- VCC
+</code></pre>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Mood light maintained by <a href="https://github.com/theapi">theapi</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
