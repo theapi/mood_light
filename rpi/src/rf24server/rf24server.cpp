@@ -58,41 +58,41 @@ void dostuff(int); /* function prototype */
 int communicate(int);
 void error(const char *msg)
 {
-    perror(msg);
-    exit(1);
+  perror(msg);
+  exit(1);
 }
 
 int main(int argc, char *argv[])
 {
 
-     signal(SIGCHLD, SIG_IGN); // No zombies
+  signal(SIGCHLD, SIG_IGN); // No zombies
 
-     int sockfd, newsockfd, portno, pid;
-     socklen_t clilen;
-     struct sockaddr_in serv_addr, cli_addr;
+  int sockfd, newsockfd, portno, pid;
+  socklen_t clilen;
+  struct sockaddr_in serv_addr, cli_addr;
 
-     if (argc < 2) {
-         fprintf(stderr,"ERROR, no port provided\n");
-         exit(1);
-     }
+  if (argc < 2) {
+     fprintf(stderr,"ERROR, no port provided\n");
+     exit(1);
+  }
 
-     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-     if (sockfd < 0)
-        error("ERROR opening socket");
-     bzero((char *) &serv_addr, sizeof(serv_addr));
-     portno = atoi(argv[1]);
-     serv_addr.sin_family = AF_INET;
-     serv_addr.sin_addr.s_addr = INADDR_ANY;
-     serv_addr.sin_port = htons(portno);
-     if (bind(sockfd, (struct sockaddr *) &serv_addr,
-              sizeof(serv_addr)) < 0)
-              error("ERROR on binding");
-     listen(sockfd,5);
-     clilen = sizeof(cli_addr);
-     
-     printf("\nListening for commands on %d...\n", portno);
-     
-     
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0)
+    error("ERROR opening socket");
+  bzero((char *) &serv_addr, sizeof(serv_addr));
+  portno = atoi(argv[1]);
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_addr.s_addr = INADDR_ANY;
+  serv_addr.sin_port = htons(portno);
+  if (bind(sockfd, (struct sockaddr *) &serv_addr,
+          sizeof(serv_addr)) < 0)
+          error("ERROR on binding");
+  listen(sockfd,5);
+  clilen = sizeof(cli_addr);
+
+  printf("\nListening for commands on %d...\n", portno);
+
+
 /***** RF24 *********/
 
   // Setup and configure rf radio
@@ -100,43 +100,41 @@ int main(int argc, char *argv[])
   // 2 byte payload
   radio.setPayloadSize(2);
   // Ensure autoACK is enabled
-  radio.setAutoAck(1);                    
+  radio.setAutoAck(1);
   // optionally, increase the delay between retries & # of retries
   radio.setRetries(15,15);
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
-  
- 
+
+
   /***********************************/
   // This simple sketch opens two pipes for these two nodes to communicate
   // back and forth.
   radio.openWritingPipe(pipes[0]);
   radio.openReadingPipe(1,pipes[1]);
 
-  
-  
-/**** end rf24 ***/
-     
 
-     while (1) {
-         // Socket server
-         newsockfd = accept(sockfd,
-               (struct sockaddr *) &cli_addr, &clilen);
-         if (newsockfd < 0)
-             error("ERROR on accept");
-         pid = fork();
-         if (pid < 0)
-             error("ERROR on fork");
-         if (pid == 0)  {
-             close(sockfd);
-             dostuff(newsockfd);
-             exit(0);
-         }
-         else close(newsockfd);
-          
-     } /* end of while */
-     close(sockfd);
-     return 0; /* we never get here */
+/**** end rf24 ***/
+
+  while (1) {
+    // Socket server
+    newsockfd = accept(sockfd,
+      (struct sockaddr *) &cli_addr, &clilen);
+    if (newsockfd < 0)
+      error("ERROR on accept");
+    pid = fork();
+    if (pid < 0)
+      error("ERROR on fork");
+    if (pid == 0)  {
+      close(sockfd);
+      dostuff(newsockfd);
+      exit(0);
+    }
+    else close(newsockfd);
+
+  } /* end of while */
+  close(sockfd);
+  return 0; /* we never get here */
 }
 
 /******** DOSTUFF() *********************
@@ -147,69 +145,69 @@ int main(int argc, char *argv[])
 void dostuff (int sock)
 {
 
-   while (communicate(sock)) {
-      // todo: implement socket still connect check (write() occasionally)
+  while (communicate(sock)) {
+    // todo: implement socket still connect check (write() occasionally)
 
-      // todo: close open sockets on ctl C (if possible) to stop:
-      // "ERROR on binding: Address already in use"
-   }
+    // todo: close open sockets on ctl C (if possible) to stop:
+    // "ERROR on binding: Address already in use"
+  }
 }
 
 int communicate (int sock)
 {
-	
-   int n;
-   char buffer[256];
 
-   bzero(buffer,256);
-   n = read(sock,buffer,255);
-   if (n < 0) {
-       error("ERROR reading from socket");
-       return 0;
-   }
+  int n;
+  char buffer[256];
 
-   // Send bye to close the connection
-   char *pos = strstr(buffer, "bye");
-   if (pos - buffer == 0) {
-	   printf("Got: bye\n");
-	   return 0;
-   }
-   
-   printf("Got: %s",buffer);
-   
-   	// Take the input as an int, 
-	// chop it to a short (2 bytes).
-	// So maximum code number is 32767 (int on 16bit arduino)
-	short code = atoi(buffer);
-	// Response codes are http status codes.
-	if (code > 0) {
-		// Got a valid code
-		n = write(sock, "200", 3);
-	} else {
-		// Bad request
-		char *pos = strstr(buffer, "coffee");
-	    if (pos - buffer == 0) {
-			// http://www.ietf.org/rfc/rfc2324.txt "I'm a teapot" :-)
-		    n = write(sock, "418", 3);
-	    } else {
-			n = write(sock, "400", 3);
-		}
-	}
-    if (n < 0) {
-        error("ERROR writing to socket");
-        return 0;
-    }
+  bzero(buffer,256);
+  n = read(sock,buffer,255);
+  if (n < 0) {
+    error("ERROR reading from socket");
+    return 0;
+  }
 
-	if (code > 0) {
-		// Send it to the arduino via the nRF24L01+.
-		printf("RF24 -> %hd\n", code);
-		bool ok = radio.write( &code, 2 );
-		if (!ok){
-			printf("  failed.\n");
-		}
+  // Send bye to close the connection
+  char *pos = strstr(buffer, "bye");
+  if (pos - buffer == 0) {
+    printf("Got: bye\n");
+    return 0;
+  }
+
+  printf("Got: %s",buffer);
+
+  // Take the input as an int,
+  // chop it to a short (2 bytes).
+  // So maximum code number is 32767 (int on 16bit arduino)
+  short code = atoi(buffer);
+  // Response codes are http status codes.
+  if (code > 0) {
+    // Got a valid code
+    n = write(sock, "200", 3);
+  } else {
+    // Bad request
+    char *pos = strstr(buffer, "coffee");
+    if (pos - buffer == 0) {
+        // http://www.ietf.org/rfc/rfc2324.txt "I'm a teapot" :-)
+        n = write(sock, "418", 3);
     } else {
-		printf("  ignored, not a number.\n");
-	}
+        n = write(sock, "400", 3);
+    }
+  }
+  if (n < 0) {
+    error("ERROR writing to socket");
+    return 0;
+  }
 
-   return 1;
+  if (code > 0) {
+    // Send it to the arduino via the nRF24L01+.
+    printf("RF24 -> %hd\n", code);
+    bool ok = radio.write( &code, 2 );
+    if (!ok){
+      printf("  failed.\n");
+    }
+  } else {
+      printf("  ignored, not a number.\n");
+  }
+
+  return 1;
 }
