@@ -1,10 +1,19 @@
-/* A simple server in the internet domain using TCP
-   The port number is passed as an argument
-   This version runs forever, forking off a separate
-   process for each connection
-
-http://www.linuxhowtos.org/C_C++/socket.htm
-
+/**
+ *
+ * A socket server that listens for mumerical commands
+ * and forwards them to listening nRF24L01+ nodes.
+ *
+ * Normally this is stateless so one number sent per connection.
+ *
+ * To keep the connection open the first command must be 2
+ *   to which the response will be 201
+ * To close a connection opened with the "2" command, send 3
+ *
+ * Any number greater than 31 is passed to the listening nodes.
+ *
+ * If it has not been possible to write to the radio receiver
+ * the return code will be 504.
+ *
 */
 #include <stdio.h>
 #include <unistd.h>
@@ -14,9 +23,6 @@ http://www.linuxhowtos.org/C_C++/socket.htm
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
-
-//#include <arduPi.h>
-//  g++ -lrt -lpthread  -I/home/pi/arduPi /home/pi/arduPi/arduPi.cpp src/server/server.cpp -o server
 
 /**
  * Adapted from
@@ -55,7 +61,9 @@ const uint8_t pipes[][6] = {"1Node","2Node"};
 
 
 void dostuff(int); /* function prototype */
-int communicate(int);
+int communicate(int, bool&);
+bool respond(int, const char*);
+
 void error(const char *msg)
 {
   perror(msg);
@@ -144,13 +152,16 @@ int main(int argc, char *argv[])
  *****************************************/
 void dostuff (int sock)
 {
+  bool keep_alive = false;
 
-  while (communicate(sock)) {
+  while (communicate(sock, keep_alive)) {
     // todo: implement socket still connect check (write() occasionally)
 
     // todo: close open sockets on ctl C (if possible) to stop:
     // "ERROR on binding: Address already in use"
   }
+
+  close(sock);
 }
 
 /**
@@ -165,61 +176,78 @@ void dostuff (int sock)
  *
  *
  */
-int communicate (int sock)
+int communicate (int sock, bool &keep_alive)
 {
 
   int n;
-  char buffer[256];
+  char buffer[32];
 
-  bzero(buffer,256);
-  n = read(sock,buffer,255);
+
+  bzero(buffer, 32);
+  n = read(sock, buffer, 31);
   if (n < 0) {
     error("ERROR reading from socket");
     return 0;
   }
 
-  // Send bye to close the connection
-  char *pos = strstr(buffer, "bye");
-  if (pos - buffer == 0) {
-    printf("Got: bye\n");
-    return 0;
-  }
-
-  printf("Got: %s",buffer);
+  printf("Got: %s", buffer);
 
   // Take the input as an int,
   // chop it to a short (2 bytes).
   // So maximum code number is 32767 (int on 16bit arduino)
   short code = atoi(buffer);
+
   // Response codes are http status codes.
   if (code > 0) {
-    // Got a valid code
-    n = write(sock, "200", 3);
+
+    // Handle the code
+    if (code > 31) {
+
+      // Send it to the arduino via the nRF24L01+.
+      printf("RF24 -> %hd\n", code);
+      bool ok = radio.write( &code, 2 );
+      if (!ok) {
+        printf("  failed.\n");
+        respond(sock, "504");
+      } else {
+        respond(sock, "200");
+      }
+
+      if (!keep_alive) {
+        // Stateless request so close the connection now.
+        return 0;
+      }
+
+    } else if (code == 3) {
+      // Close the connection
+      return 0;
+    } else if (code == 2) {
+      // Keep the connection open
+      keep_alive = true;
+      if (!respond(sock, "201")) {
+        return 0;
+      }
+    }
+
   } else {
     // Bad request
-    char *pos = strstr(buffer, "coffee");
-    if (pos - buffer == 0) {
-        // http://www.ietf.org/rfc/rfc2324.txt "I'm a teapot" :-)
-        n = write(sock, "418", 3);
-    } else {
-        n = write(sock, "400", 3);
+    if (!respond(sock, "400")) {
+      return 0;
     }
   }
+
+  return 1;
+}
+
+/**
+ * Send the 3 character response and check for failure.
+ */
+bool respond(int sock, const char *msg)
+{
+  int n = write(sock, msg, 3);
   if (n < 0) {
     error("ERROR writing to socket");
     return 0;
   }
-
-  if (code > 0) {
-    // Send it to the arduino via the nRF24L01+.
-    printf("RF24 -> %hd\n", code);
-    bool ok = radio.write( &code, 2 );
-    if (!ok){
-      printf("  failed.\n");
-    }
-  } else {
-      printf("  ignored, not a number.\n");
-  }
-
   return 1;
 }
