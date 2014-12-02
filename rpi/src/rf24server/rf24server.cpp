@@ -153,6 +153,18 @@ void dostuff (int sock)
   }
 }
 
+/**
+ * Protocol:
+ *  Only acts on 16bit numbers (short)
+ *    2 = Start session (ascii "start of text"):
+ *        The server will not automatically disconnect after reading the number.
+ *    3 = End session (ascii "end of text"):
+ *        The server will disconnect
+ *
+ *    >= 32 Gets forwarded via the radio
+ *
+ *
+ */
 int communicate (int sock)
 {
 
