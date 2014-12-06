@@ -56,9 +56,11 @@ using namespace std;
 RF24 radio(RPI_V2_GPIO_P1_15, RPI_V2_GPIO_P1_24, BCM2835_SPI_SPEED_8MHZ);
 
 
-// Radio pipe addresses for the 2 nodes to communicate.
-const uint8_t pipes[][6] = {"1Node", "2Node", "3Node", "4Node", "5Node", "6Node"};
-
+// Addresses of potential listening nodes
+const uint8_t pipes[][6] = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF", "HHHHH"};
+// Default to 4 listening nodes.
+uint8_t num_clients = 4;
+uint8_t num_clients_max = 7;
 
 void dostuff(int); /* function prototype */
 int communicate(int, bool&);
@@ -82,6 +84,15 @@ int main(int argc, char *argv[])
   if (argc < 2) {
      fprintf(stderr,"ERROR, no port provided\n");
      exit(1);
+  }
+
+  // Set the number of clients if given.
+  // eg; sudo ./rf24server.cpp 2000 2 (for 2 clients on port 2000)
+  if (argc > 2) {
+    num_clients = atoi(argv[2]);
+    if (num_clients > num_clients_max) {
+      num_clients = num_clients_max;
+    }
   }
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -109,15 +120,10 @@ int main(int argc, char *argv[])
   radio.setPayloadSize(2);
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
-  // optionally, increase the delay between retries & # of retries
-  radio.setRetries(15,15);
+  // Try a few times to get the message through
+  radio.setRetries(0,15);
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
-
-
-  /***********************************/
-  // Send message to the node on the pipe address
-  //radio.openWritingPipe(pipes[2]);
 
 
 /**** end rf24 ***/
@@ -153,8 +159,6 @@ void dostuff (int sock)
   bool keep_alive = false;
 
   while (communicate(sock, keep_alive)) {
-    // todo: implement socket still connect check (write() occasionally)
-
     // todo: close open sockets on ctl C (if possible) to stop:
     // "ERROR on binding: Address already in use"
   }
@@ -188,8 +192,6 @@ int communicate (int sock, bool &keep_alive)
     return 0;
   }
 
-  //printf("Got: %s", buffer);
-
   // Take the input as an int,
   // chop it to a short (2 bytes).
   // So maximum code number is 32767 (int on 16bit arduino)
@@ -200,26 +202,25 @@ int communicate (int sock, bool &keep_alive)
 
     // Handle the code
     if (code > 31) {
-
-      // Send it to the arduino via the nRF24L01+.
-
-      for (int i=1; i<6; i++) {
+      printf("%hd:", code);
+      // Send it to the clients via the nRF24L01+.
+      for (int i = 0; i < num_clients; i++) {
         // Send message to the node on the pipe address
-    //radio.openWritingPipe(pipes[2]);
         radio.stopListening();
         radio.openWritingPipe(pipes[i]);
 
-        printf("RF24: %s -> %hd\n", pipes[i], code);
+        //printf("\n%s -> %hd", pipes[i], code);
+        printf(" %s ", pipes[i]);
         bool ok = radio.write( &code, 2 );
         if (!ok) {
-          printf("  failed.\n");
           respond(sock, "504");
+          printf("(0)");
         } else {
           respond(sock, "200");
+          printf("(1)");
         }
       }
-
-
+      printf("\n");
 
       if (!keep_alive) {
         // Stateless request so close the connection now.
