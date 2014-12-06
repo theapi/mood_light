@@ -16,13 +16,16 @@
  *
 */
 #include <stdio.h>
-#include <unistd.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <signal.h>
+#include <netdb.h>
+
+#include <arpa/inet.h>
+#include <strings.h>
 
 /**
  * Adapted from
@@ -35,6 +38,7 @@
 #include <string>
 #include <RF24/RF24.h>
 
+#define MAXMSG  32
 
 using namespace std;
 //
@@ -72,19 +76,123 @@ void error(const char *msg)
   exit(1);
 }
 
+int make_socket (uint16_t port)
+{
+  int sock;
+  struct sockaddr_in name;
+
+  /* Create the socket. */
+  sock = socket (PF_INET, SOCK_STREAM, 0);
+  if (sock < 0)
+    {
+      perror ("socket");
+      exit (EXIT_FAILURE);
+    }
+
+  /* Give the socket a name. */
+  name.sin_family = AF_INET;
+  name.sin_port = htons (port);
+  name.sin_addr.s_addr = htonl (INADDR_ANY);
+  if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
+    {
+      perror ("bind");
+      exit (EXIT_FAILURE);
+    }
+
+  return sock;
+}
+
+int read_from_client (int sock, RF24 radio)
+{
+  char buffer[MAXMSG];
+  int nbytes;
+
+  bzero(buffer, MAXMSG);
+  nbytes = read (sock, buffer, MAXMSG);
+  if (nbytes < 0)
+    {
+      /* Read error. */
+      perror ("read");
+      exit (EXIT_FAILURE);
+    }
+  else if (nbytes == 0)
+    /* End-of-file. */
+    return -1;
+  else
+    {
+      /* Data read. */
+      //fprintf (stderr, "Server: got message: `%s'\n", buffer);
+
+
+      // Take the input as an int,
+      // chop it to a short (2 bytes).
+      // So maximum code number is 32767 (int on 16bit arduino)
+      short code = atoi(buffer);
+
+      // Response codes are http status codes.
+      if (code > 0) {
+
+        // Handle the code
+        if (code > 31) {
+          printf("%hd:", code);
+          // Send it to the clients via the nRF24L01+.
+          for (int i = 0; i < num_clients; i++) {
+            // Send message to the node on the pipe address
+            radio.stopListening();
+            radio.openWritingPipe(pipes[i]);
+
+            //printf("\n%s -> %hd", pipes[i], code);
+            printf(" %s ", pipes[i]);
+            bool ok = radio.write( &code, 2 );
+            if (!ok) {
+              respond(sock, "504");
+              printf("(0)");
+            } else {
+              respond(sock, "200");
+              printf("(1)");
+            }
+          }
+          printf("\n");
+
+        } else if (code == 3) {
+          // Close the connection
+          return -1;
+        } else if (code == 2) {
+          // Keep the connection open
+          if (!respond(sock, "201")) {
+            return -1;
+          }
+        }
+
+      } else {
+        // Bad request
+        if (!respond(sock, "400")) {
+          return -1;
+        }
+      }
+
+      return 0;
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
 
-  signal(SIGCHLD, SIG_IGN); // No zombies
+  //signal(SIGCHLD, SIG_IGN); // No zombies
 
+  uint16_t port;
+  /*
   int sockfd, newsockfd, portno, pid;
   socklen_t clilen;
   struct sockaddr_in serv_addr, cli_addr;
+*/
 
   if (argc < 2) {
      fprintf(stderr,"ERROR, no port provided\n");
      exit(1);
   }
+  port = atoi(argv[1]);
 
   // Set the number of clients if given.
   // eg; sudo ./rf24server.cpp 2000 2 (for 2 clients on port 2000)
@@ -95,21 +203,26 @@ int main(int argc, char *argv[])
     }
   }
 
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd < 0)
-    error("ERROR opening socket");
-  bzero((char *) &serv_addr, sizeof(serv_addr));
-  portno = atoi(argv[1]);
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_addr.s_addr = INADDR_ANY;
-  serv_addr.sin_port = htons(portno);
-  if (bind(sockfd, (struct sockaddr *) &serv_addr,
-          sizeof(serv_addr)) < 0)
-          error("ERROR on binding");
-  listen(sockfd,5);
-  clilen = sizeof(cli_addr);
+  extern int make_socket (uint16_t port);
+  int sock;
+  fd_set active_fd_set, read_fd_set;
+  int i;
+  struct sockaddr_in clientname;
+  size_t size;
 
-  printf("\nListening for commands on %d...\n", portno);
+  /* Create the socket and set it up to accept connections. */
+  sock = make_socket (port);
+  if (listen (sock, 1) < 0)
+    {
+      perror ("listen");
+      exit (EXIT_FAILURE);
+    }
+
+  /* Initialize the set of active sockets. */
+  FD_ZERO (&active_fd_set);
+  FD_SET (sock, &active_fd_set);
+
+  printf("\nListening for commands on %d...\n", port);
 
 
 /***** RF24 *********/
@@ -128,124 +241,53 @@ int main(int argc, char *argv[])
 
 /**** end rf24 ***/
 
-  while (1) {
-    // Socket server
-    newsockfd = accept(sockfd,
-      (struct sockaddr *) &cli_addr, &clilen);
-    if (newsockfd < 0)
-      error("ERROR on accept");
-    pid = fork();
-    if (pid < 0)
-      error("ERROR on fork");
-    if (pid == 0)  {
-      close(sockfd);
-      dostuff(newsockfd);
-      exit(0);
-    }
-    else close(newsockfd);
-
-  } /* end of while */
-  close(sockfd);
-  return 0; /* we never get here */
-}
-
-/******** DOSTUFF() *********************
- There is a separate instance of this function
- for each connection.  It handles all communication
- once a connnection has been established.
- *****************************************/
-void dostuff (int sock)
-{
-  bool keep_alive = false;
-
-  while (communicate(sock, keep_alive)) {
-    // todo: close open sockets on ctl C (if possible) to stop:
-    // "ERROR on binding: Address already in use"
-  }
-
-  close(sock);
-}
-
-/**
- * Protocol:
- *  Only acts on 16bit numbers (short)
- *    2 = Start session (ascii "start of text"):
- *        The server will not automatically disconnect after reading the number.
- *    3 = End session (ascii "end of text"):
- *        The server will disconnect
- *
- *    >= 32 Gets forwarded via the radio
- *
- *
- */
-int communicate (int sock, bool &keep_alive)
-{
-
-  int n;
-  char buffer[32];
 
 
-  bzero(buffer, 32);
-  n = read(sock, buffer, 31);
-  if (n < 0) {
-    error("ERROR reading from socket");
-    return 0;
-  }
-
-  // Take the input as an int,
-  // chop it to a short (2 bytes).
-  // So maximum code number is 32767 (int on 16bit arduino)
-  short code = atoi(buffer);
-
-  // Response codes are http status codes.
-  if (code > 0) {
-
-    // Handle the code
-    if (code > 31) {
-      printf("%hd:", code);
-      // Send it to the clients via the nRF24L01+.
-      for (int i = 0; i < num_clients; i++) {
-        // Send message to the node on the pipe address
-        radio.stopListening();
-        radio.openWritingPipe(pipes[i]);
-
-        //printf("\n%s -> %hd", pipes[i], code);
-        printf(" %s ", pipes[i]);
-        bool ok = radio.write( &code, 2 );
-        if (!ok) {
-          respond(sock, "504");
-          printf("(0)");
-        } else {
-          respond(sock, "200");
-          printf("(1)");
+  while (1)
+    {
+      /* Block until input arrives on one or more active sockets. */
+      read_fd_set = active_fd_set;
+      if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0)
+        {
+          perror ("select");
+          exit (EXIT_FAILURE);
         }
-      }
-      printf("\n");
 
-      if (!keep_alive) {
-        // Stateless request so close the connection now.
-        return 0;
-      }
-
-    } else if (code == 3) {
-      // Close the connection
-      return 0;
-    } else if (code == 2) {
-      // Keep the connection open
-      keep_alive = true;
-      if (!respond(sock, "201")) {
-        return 0;
-      }
+      /* Service all the sockets with input pending. */
+      for (i = 0; i < FD_SETSIZE; ++i)
+        if (FD_ISSET (i, &read_fd_set))
+          {
+            if (i == sock)
+              {
+                /* Connection request on original socket. */
+                int new_client;
+                size = sizeof (clientname);
+                new_client = accept (sock,
+                              (struct sockaddr *) &clientname,
+                              &size);
+                if (new_client < 0)
+                  {
+                    perror ("accept");
+                    exit (EXIT_FAILURE);
+                  }
+                printf("Server: connect from host %s, port %hd.\n",
+                      inet_ntoa (clientname.sin_addr),
+                      ntohs (clientname.sin_port));
+                FD_SET (new_client, &active_fd_set);
+              }
+            else
+              {
+                /* Data arriving on an already-connected socket. */
+                if (read_from_client (i, radio) < 0)
+                  {
+                    printf("\nClose socket: %d...\n", i);
+                    close (i);
+                    FD_CLR (i, &active_fd_set);
+                  }
+              }
+          }
     }
 
-  } else {
-    // Bad request
-    if (!respond(sock, "400")) {
-      return 0;
-    }
-  }
-
-  return 1;
 }
 
 /**
