@@ -57,7 +57,7 @@ RF24 radio(RPI_V2_GPIO_P1_15, RPI_V2_GPIO_P1_24, BCM2835_SPI_SPEED_8MHZ);
 
 
 // Radio pipe addresses for the 2 nodes to communicate.
-const uint8_t pipes[][6] = {"1Node","2Node"};
+const uint8_t pipes[][6] = {"1Node", "2Node", "3Node", "4Node", "5Node", "6Node"};
 
 
 void dostuff(int); /* function prototype */
@@ -116,10 +116,8 @@ int main(int argc, char *argv[])
 
 
   /***********************************/
-  // This simple sketch opens two pipes for these two nodes to communicate
-  // back and forth.
-  radio.openWritingPipe(pipes[0]);
-  radio.openReadingPipe(1,pipes[1]);
+  // Send message to the node on the pipe address
+  //radio.openWritingPipe(pipes[2]);
 
 
 /**** end rf24 ***/
@@ -190,7 +188,7 @@ int communicate (int sock, bool &keep_alive)
     return 0;
   }
 
-  printf("Got: %s", buffer);
+  //printf("Got: %s", buffer);
 
   // Take the input as an int,
   // chop it to a short (2 bytes).
@@ -204,14 +202,24 @@ int communicate (int sock, bool &keep_alive)
     if (code > 31) {
 
       // Send it to the arduino via the nRF24L01+.
-      printf("RF24 -> %hd\n", code);
-      bool ok = radio.write( &code, 2 );
-      if (!ok) {
-        printf("  failed.\n");
-        respond(sock, "504");
-      } else {
-        respond(sock, "200");
+
+      for (int i=1; i<6; i++) {
+        // Send message to the node on the pipe address
+    //radio.openWritingPipe(pipes[2]);
+        radio.stopListening();
+        radio.openWritingPipe(pipes[i]);
+
+        printf("RF24: %s -> %hd\n", pipes[i], code);
+        bool ok = radio.write( &code, 2 );
+        if (!ok) {
+          printf("  failed.\n");
+          respond(sock, "504");
+        } else {
+          respond(sock, "200");
+        }
       }
+
+
 
       if (!keep_alive) {
         // Stateless request so close the connection now.
