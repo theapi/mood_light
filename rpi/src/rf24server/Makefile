@@ -1,15 +1,7 @@
 #############################################################################
 #
-# Makefile for librf24 examples on Raspberry Pi
+# Makefile for rf24server on Raspberry Pi
 #
-# License: GPL (General Public License)
-# Author:  gnulnulf <arco@appeltaart.mine.nu>
-# Date:    2013/02/07 (version 1.0)
-#
-# Description:
-# ------------
-# use make all and make install to install the examples
-# You can change the install directory by editing the prefix line
 #
 prefix := /usr/local
 
@@ -19,7 +11,7 @@ CCFLAGS=-Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
 
 # define all programs
 #PROGRAMS = scanner pingtest gettingstarted
-PROGRAMS = server
+PROGRAMS = rf24server
 SOURCES = ${PROGRAMS:=.cpp}
 
 all: ${PROGRAMS}
