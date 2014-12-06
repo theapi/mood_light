@@ -38,6 +38,11 @@
 #include <string>
 #include <RF24/RF24.h>
 
+// If a failure has been detected, it usually indicates a hardware issue.
+// @see RF24.h
+#define FAILURE_HANDLING
+
+// Maximum size of incomming message
 #define MAXMSG  32
 
 using namespace std;
