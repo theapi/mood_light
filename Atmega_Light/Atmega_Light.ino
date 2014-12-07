@@ -42,7 +42,11 @@ void setup()
   radio.setPayloadSize(2);                // Only two byte payload gets sent (int on arduino) (short on 32bit rpi)
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
-
+  // Slower data rate for more range
+  //radio.setDataRate(RF24_250KBPS);
+  // Allow optional ack payloads
+  radio.enableAckPayload();
+  
   radio.openReadingPipe(1, address);
   radio.startListening(); // Start listening
   
@@ -57,9 +61,12 @@ void loop(void)
     // Get the payload
 
     int got_val; 
-    radio.read( &got_val, 2);    
+    radio.read( &got_val, sizeof(got_val));    
       
     if (got_val > 0) {
+      // Create the payload for the NEXT ack response.
+      radio.writeAckPayload(1, &got_val, sizeof(got_val));
+      
       printf("Got: %d \n\r", got_val);
       //@todo: process commands...
     }
