@@ -1,10 +1,17 @@
 /**
- * Mood light with IR remote control.
- */
 
+ Arduino/ATmega328 listening for commands from the central controller, the Raspberry Pi.
+ 
+
+ As the arduino ide can only have one serial monitor open, use minicom if needed:
+  minicom --baudrate 57600 --device /dev/ttyUSB0
+  
+ Using the RF24 library from https://github.com/TMRh20/RF24
+ 
+ */
 //#define RX_ADDRESS "AAAAA"
-//#define RX_ADDRESS "BBBBB"
-#define RX_ADDRESS "CCCCC"
+#define RX_ADDRESS "BBBBB"
+//#define RX_ADDRESS "CCCCC"
 //#define RX_ADDRESS "DDDDD"
 //#define RX_ADDRESS "EEEEE"
 // @todo: hardware defined address
