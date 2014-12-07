@@ -9,7 +9,7 @@
 //#define RX_ADDRESS "EEEEE"
 // @todo: hardware defined address
 
-#define BASE_ADDRESS "3BASE"
+#define BASE_ADDRESS "1BASE"
 
 #include <SPI.h>
 #include "nRF24L01.h"
@@ -28,6 +28,7 @@ RF24 radio(PIN_CE, PIN_CSN);
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
 
+int ack = 0;
 
 // the pin used for the infrared receiver 
 int RECV_PIN = 2;
@@ -77,16 +78,24 @@ void loop(void)
   if (radio.available()) {
     // Get the payload
 
-    int got_val; 
-    radio.read( &got_val, sizeof(got_val));     
-    if (got_val > 0) {
-      // Create the ack payload.
-      radio.writeAckPayload(1, &got_val, sizeof(got_val));
+    while (radio.available()) {   
+      // Create the ack payload for the NEXT message.
+      radio.writeAckPayload(1, &ack, sizeof(ack));
+      ack++;
       
+      int got_val; 
+      radio.read( &got_val, sizeof(got_val));    
+      
+   
       printf("Got: %d \n\r", got_val);
-      //@todo: process commands...
+      
+      if (got_val > 0) {
+        
+        //@todo: process commands...
+      }
     }
   }
+  
   
   // Check for a new IR code
   if (irrecv.decode(&results)) {
@@ -107,8 +116,9 @@ void loop(void)
     }
     // Start receiving codes again
     irrecv.resume();
+    
   }
-
+  
 }
 
 /**
