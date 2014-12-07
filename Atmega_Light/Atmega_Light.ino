@@ -18,6 +18,8 @@
 //#define RX_ADDRESS "EEEEE"
 // @todo: hardware defined address
 
+#define BASE_ADDRESS "2BASE"
+
 #include <SPI.h>
 #include "nRF24L01.h"
 #include "RF24.h"
@@ -28,6 +30,7 @@
  
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
+byte address_base[6] = BASE_ADDRESS;
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -42,15 +45,19 @@ void setup()
   radio.setPayloadSize(2);                // Only two byte payload gets sent (int on arduino) (short on 32bit rpi)
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
-  // Slower data rate for more range
-  //radio.setDataRate(RF24_250KBPS);
   // Allow optional ack payloads
   radio.enableAckPayload();
   
-  radio.openReadingPipe(1, address);
-  radio.startListening(); // Start listening
+  // Pipe for talking to the base
+  radio.openWritingPipe(address_base);
   
-  radio.printDetails();                   // Dump the configuration of the rf unit for debugging
+  // Pipe for listening to the base
+  radio.openReadingPipe(1, address);
+  
+  // Start listening
+  radio.startListening(); 
+  // Dump the configuration of the rf unit for debugging
+  radio.printDetails();                   
 }
 
 void loop(void)
@@ -62,9 +69,8 @@ void loop(void)
 
     int got_val; 
     radio.read( &got_val, sizeof(got_val));    
-      
     if (got_val > 0) {
-      // Create the payload for the NEXT ack response.
+      // Create the ack payload.
       radio.writeAckPayload(1, &got_val, sizeof(got_val));
       
       printf("Got: %d \n\r", got_val);
