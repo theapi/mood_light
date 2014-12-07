@@ -147,13 +147,15 @@ int read_from_client (int sock, RF24 radio)
 
             //printf("\n%s -> %hd", radio_clients[i], code);
             printf(" %s ", radio_clients[i]);
+
+            // NB: seems to be that it does not send the same message twice in a row
+            // BUT radio.write still returns true AND the ack payload is the same as last time.
+
             bool ok = radio.write( &code, 2 );
             if (!ok) {
               respond(sock, "504");
               printf("(0)");
             } else {
-              respond(sock, "200");
-              printf("(1)");
 
               // If an ack with payload was received
               while (radio.available()) {
@@ -162,6 +164,9 @@ int read_from_client (int sock, RF24 radio)
                 // just dump it to screen for now.
                 printf("ack:%hd", ack_payload);
               }
+
+              respond(sock, "200");
+              printf("(1)");
             }
 
             // Contiune listening
@@ -325,6 +330,7 @@ int main(int argc, char *argv[])
         // just dump it to screen for now.
         printf("payload:%hd\n", payload);
       }
+
 
     }
 
