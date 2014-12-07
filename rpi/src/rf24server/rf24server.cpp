@@ -26,6 +26,7 @@
 
 #include <arpa/inet.h>
 #include <strings.h>
+#include <sys/time.h>
 
 /**
  * Adapted from
@@ -62,10 +63,12 @@ RF24 radio(RPI_V2_GPIO_P1_15, RPI_V2_GPIO_P1_24, BCM2835_SPI_SPEED_8MHZ);
 
 
 // Addresses of potential listening nodes
-const uint8_t pipes[][6] = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF", "HHHHH"};
+const uint8_t radio_clients[][6] = {"AAAAA", "BBBBB", "CCCCC", "DDDDD", "EEEEE", "FFFFF", "HHHHH"};
 // Default to 4 listening nodes.
 uint8_t num_clients = 4;
 uint8_t num_clients_max = 7;
+// Radio pipes
+const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
 void dostuff(int); /* function prototype */
 int communicate(int, bool&);
@@ -140,10 +143,10 @@ int read_from_client (int sock, RF24 radio)
           for (int i = 0; i < num_clients; i++) {
             // Send message to the node on the pipe address
             radio.stopListening();
-            radio.openWritingPipe(pipes[i]);
+            radio.openWritingPipe(radio_clients[i]);
 
-            //printf("\n%s -> %hd", pipes[i], code);
-            printf(" %s ", pipes[i]);
+            //printf("\n%s -> %hd", radio_clients[i], code);
+            printf(" %s ", radio_clients[i]);
             bool ok = radio.write( &code, 2 );
             if (!ok) {
               respond(sock, "504");
@@ -160,6 +163,10 @@ int read_from_client (int sock, RF24 radio)
                 printf("ack:%hd", ack_payload);
               }
             }
+
+            // Contiune listening
+            radio.startListening();
+
           }
           printf("\n");
 
@@ -218,6 +225,7 @@ int main(int argc, char *argv[])
   int i;
   struct sockaddr_in clientname;
   size_t size;
+  struct timeval tv;
 
   /* Create the socket and set it up to accept connections. */
   sock = make_socket (port);
@@ -230,6 +238,10 @@ int main(int argc, char *argv[])
   /* Initialize the set of active sockets. */
   FD_ZERO (&active_fd_set);
   FD_SET (sock, &active_fd_set);
+
+  // Allow select to block for 200000 us
+  tv.tv_sec = 0;
+  tv.tv_usec = 200000;
 
   printf("\nListening for commands on %d...\n", port);
 
@@ -247,57 +259,73 @@ int main(int argc, char *argv[])
   // Try a few times to get the message through
   radio.setRetries(0,15);
 
+  // Listen to the pipes
+  for (int i = 0; i < 5; i++) {
+    radio.openReadingPipe(i+1, pipes[i]);
+  }
+  radio.startListening();
+
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
-
 
 /**** end rf24 ***/
 
 
 
-  while (1)
-    {
-      /* Block until input arrives on one or more active sockets. */
-      read_fd_set = active_fd_set;
-      if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0)
-        {
-          perror ("select");
-          exit (EXIT_FAILURE);
-        }
+  while (1) {
+    // Listen for input on one or more active sockets.
+    // For a max time of tv.tv_usec
+    read_fd_set = active_fd_set;
+    if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv) < 0) {
+      perror ("select");
+      exit (EXIT_FAILURE);
+    }
 
-      /* Service all the sockets with input pending. */
-      for (i = 0; i < FD_SETSIZE; ++i)
-        if (FD_ISSET (i, &read_fd_set))
-          {
-            if (i == sock)
-              {
-                /* Connection request on original socket. */
-                int new_client;
-                size = sizeof (clientname);
-                new_client = accept (sock,
-                              (struct sockaddr *) &clientname,
-                              &size);
-                if (new_client < 0)
-                  {
-                    perror ("accept");
-                    exit (EXIT_FAILURE);
-                  }
-                printf("Server: connect from host %s, port %hd.\n",
-                      inet_ntoa (clientname.sin_addr),
-                      ntohs (clientname.sin_port));
-                FD_SET (new_client, &active_fd_set);
-              }
-            else
-              {
-                /* Data arriving on an already-connected socket. */
-                if (read_from_client (i, radio) < 0)
-                  {
-                    printf("\nClose socket: %d...\n", i);
-                    close (i);
-                    FD_CLR (i, &active_fd_set);
-                  }
-              }
-          }
+    // Service all the sockets with input pending
+    for (i = 0; i < FD_SETSIZE; ++i) {
+      if (FD_ISSET (i, &read_fd_set))
+        {
+          if (i == sock)
+            {
+              // Connection request on original socket.
+              int new_client;
+              size = sizeof (clientname);
+              new_client = accept (sock,
+                            (struct sockaddr *) &clientname,
+                            &size);
+              if (new_client < 0)
+                {
+                  perror ("accept");
+                  exit (EXIT_FAILURE);
+                }
+              printf("Server: connect from host %s, port %hd.\n",
+                    inet_ntoa (clientname.sin_addr),
+                    ntohs (clientname.sin_port));
+              FD_SET (new_client, &active_fd_set);
+            }
+          else
+            {
+              // Data arriving on an already-connected socket.
+              if (read_from_client (i, radio) < 0)
+                {
+                  printf("\nClose socket: %d...\n", i);
+                  close (i);
+                  FD_CLR (i, &active_fd_set);
+                }
+            }
+        }
+      }
+
+
+
+      // Handle any messages from the radio
+      while (radio.available()) {
+        short payload;
+        radio.read( &payload, sizeof(payload) );
+        // just dump it to screen for now.
+        printf("payload:%hd\n", payload);
+      }
+
     }
 
 }
