@@ -106,6 +106,64 @@ int make_socket (uint16_t port)
   return sock;
 }
 
+int handleCode(short code, RF24 radio, int sock)
+{
+  // Response codes are http status codes.
+  if (code > 0) {
+
+    // Handle the code
+    if (code > 31) {
+      printf("%hd:", code);
+      // Send it to the clients via the nRF24L01+.
+      for (int i = 0; i < num_clients; i++) {
+        // Send message to the node on the pipe address
+        radio.stopListening();
+        radio.openWritingPipe(radio_clients[i]);
+
+        //printf("\n%s -> %hd", radio_clients[i], code);
+        printf(" %s ", radio_clients[i]);
+
+        // NB: seems to be that it does not send the same message twice in a row
+        // BUT radio.write still returns true AND the ack payload is the same as last time.
+
+        bool ok = radio.write( &code, 2 );
+        if (!ok) {
+          respond(sock, "504");
+          printf("(0)");
+        } else {
+
+          // If an ack with payload was received
+          while (radio.available()) {
+            short ack_payload;
+            radio.read( &ack_payload, sizeof(ack_payload));
+            // just dump it to screen for now.
+            printf("ack:%hd", ack_payload);
+          }
+
+          respond(sock, "200");
+          printf("(1)");
+        }
+
+        // Continue listening
+        radio.startListening();
+
+      }
+      printf("\n");
+
+    } else if (code == 3) {
+      // Close the connection
+      return -1;
+    } else if (code == 2) {
+      // Keep the connection open
+      if (!respond(sock, "201")) {
+        return -1;
+      }
+    }
+
+  }
+  return 0;
+}
+
 int read_from_client (int sock, RF24 radio)
 {
   char buffer[MAXMSG];
@@ -133,66 +191,7 @@ int read_from_client (int sock, RF24 radio)
       // So maximum code number is 32767 (int on 16bit arduino)
       short code = atoi(buffer);
 
-      // Response codes are http status codes.
-      if (code > 0) {
-
-        // Handle the code
-        if (code > 31) {
-          printf("%hd:", code);
-          // Send it to the clients via the nRF24L01+.
-          for (int i = 0; i < num_clients; i++) {
-            // Send message to the node on the pipe address
-            radio.stopListening();
-            radio.openWritingPipe(radio_clients[i]);
-
-            //printf("\n%s -> %hd", radio_clients[i], code);
-            printf(" %s ", radio_clients[i]);
-
-            // NB: seems to be that it does not send the same message twice in a row
-            // BUT radio.write still returns true AND the ack payload is the same as last time.
-
-            bool ok = radio.write( &code, 2 );
-            if (!ok) {
-              respond(sock, "504");
-              printf("(0)");
-            } else {
-
-              // If an ack with payload was received
-              while (radio.available()) {
-                short ack_payload;
-                radio.read( &ack_payload, sizeof(ack_payload) );
-                // just dump it to screen for now.
-                printf("ack:%hd", ack_payload);
-              }
-
-              respond(sock, "200");
-              printf("(1)");
-            }
-
-            // Contiune listening
-            radio.startListening();
-
-          }
-          printf("\n");
-
-        } else if (code == 3) {
-          // Close the connection
-          return -1;
-        } else if (code == 2) {
-          // Keep the connection open
-          if (!respond(sock, "201")) {
-            return -1;
-          }
-        }
-
-      } else {
-        // Bad request
-        if (!respond(sock, "400")) {
-          return -1;
-        }
-      }
-
-      return 0;
+      return handleCode(code, radio, sock);
     }
 }
 
@@ -327,8 +326,10 @@ int main(int argc, char *argv[])
       while (radio.available()) {
         short payload;
         radio.read( &payload, sizeof(payload) );
-        // just dump it to screen for now.
+        // Dump it to screen
         printf("payload:%hd\n", payload);
+        // Tell all who care
+        handleCode(payload, radio, 0);
       }
 
 
@@ -341,6 +342,10 @@ int main(int argc, char *argv[])
  */
 bool respond(int sock, const char *msg)
 {
+  if (sock < 1) {
+    // Pretent it was sent
+    return 0;
+  }
   int n = write(sock, msg, 3);
   if (n < 0) {
     error("ERROR writing to socket");
