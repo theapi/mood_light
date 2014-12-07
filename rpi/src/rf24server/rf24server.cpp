@@ -38,10 +38,6 @@
 #include <string>
 #include <RF24/RF24.h>
 
-// If a failure has been detected, it usually indicates a hardware issue.
-// @see RF24.h
-#define FAILURE_HANDLING
-
 // Maximum size of incomming message
 #define MAXMSG  32
 
@@ -155,6 +151,14 @@ int read_from_client (int sock, RF24 radio)
             } else {
               respond(sock, "200");
               printf("(1)");
+
+              // If an ack with payload was received
+              while (radio.available()) {
+                short ack_payload;
+                radio.read( &ack_payload, sizeof(ack_payload) );
+                // just dump it to screen for now.
+                printf("ack:%hd", ack_payload);
+              }
             }
           }
           printf("\n");
@@ -238,8 +242,11 @@ int main(int argc, char *argv[])
   radio.setPayloadSize(2);
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
+  // Allow optional ack payloads
+  radio.enableAckPayload();
   // Try a few times to get the message through
   radio.setRetries(0,15);
+
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
 
