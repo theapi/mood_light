@@ -11,6 +11,12 @@
 
 */
 
+#define RX_ADDRESS "AAAAA"
+//#define RX_ADDRESS "BBBBB"
+//#define RX_ADDRESS "CCCCC"
+//#define RX_ADDRESS "DDDDD"
+//#define RX_ADDRESS "EEEEE"
+
 #include "RF24.h"
 #include <Adafruit_NeoPixel.h>
 
@@ -21,7 +27,7 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIN_NEO, NEO_GRB + NEO_KHZ800);
 RF24 radio(PIN_CE, PIN_CSN);
 
-byte addresses[][6] = {"1Node","2Node"};
+byte address[6] = RX_ADDRESS;
 
 byte wheel_pos; // the current colour wheel position 
 
@@ -37,8 +43,8 @@ void setup()
   radio.setPayloadSize(2);                // Only two byte payload gets sent (int)
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(15,15); // Max delay between retries & number of retries
-  radio.openWritingPipe(addresses[1]); // "ping back"
-  radio.openReadingPipe(1,addresses[0]);
+  // Pipe for listening to the base
+  radio.openReadingPipe(1, address);
   radio.startListening(); // Start listening
 }
 
