@@ -36,7 +36,9 @@
 
 
 // Size of messages sent to the radios in bytes
-#define PAYLOAD_SIZE 16
+// According to https://www.youtube.com/watch?v=5Xhvphsj1ms&list=UUTXOorupCLqqQifs2jbz7rQ
+// 8-16 byte payload is no good, 18 is good though.
+#define PAYLOAD_SIZE 18
 
 using namespace std;
 //
