@@ -97,21 +97,19 @@ int makeSocket(uint16_t port)
 
   /* Create the socket. */
   sock = socket (PF_INET, SOCK_STREAM, 0);
-  if (sock < 0)
-    {
-      perror ("socket");
-      exit (EXIT_FAILURE);
-    }
+  if (sock < 0) {
+    perror ("socket");
+    exit (EXIT_FAILURE);
+  }
 
   /* Give the socket a name. */
   name.sin_family = AF_INET;
   name.sin_port = htons (port);
   name.sin_addr.s_addr = htonl (INADDR_ANY);
-  if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
-    {
-      perror ("bind");
-      exit (EXIT_FAILURE);
-    }
+  if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0) {
+    perror ("bind");
+    exit (EXIT_FAILURE);
+  }
 
   return sock;
 }
@@ -178,7 +176,7 @@ int readSocket(int sock, RF24 radio)
     // Send "exit" to close the connection
     char *pos = strstr(buffer, "exit");
     if (pos - buffer == 0) {
-      printf("Got: bye\n");
+      printf("Got: exit\n");
       return -1;
     }
 
@@ -216,11 +214,10 @@ int main(int argc, char *argv[])
 
   // Create the socket and set it up to accept connections.
   sock = makeSocket(port);
-  if (listen (sock, 1) < 0)
-    {
-      perror ("listen");
-      exit (EXIT_FAILURE);
-    }
+  if (listen (sock, 1) < 0) {
+    perror ("listen");
+    exit (EXIT_FAILURE);
+  }
 
   // Initialize the set of active sockets.
   FD_ZERO (&active_fd_set);
@@ -258,7 +255,6 @@ int main(int argc, char *argv[])
 /**** end rf24 ***/
 
 
-
   while (1) {
     // Listen for input on one or more active sockets.
     // For a max time of tv.tv_usec
@@ -270,53 +266,44 @@ int main(int argc, char *argv[])
 
     // Service all the sockets with input pending
     for (i = 0; i < FD_SETSIZE; ++i) {
-      if (FD_ISSET (i, &read_fd_set))
-        {
-          if (i == sock)
-            {
-              // Connection request on original socket.
-              int new_client;
-              size = sizeof (clientname);
-              new_client = accept (sock,
-                            (struct sockaddr *) &clientname,
-                            &size);
-              if (new_client < 0)
-                {
-                  perror ("accept");
-                  exit (EXIT_FAILURE);
-                }
-              printf("Server: connect from host %s, port %hd.\n",
-                    inet_ntoa (clientname.sin_addr),
-                    ntohs (clientname.sin_port));
-              FD_SET (new_client, &active_fd_set);
-            }
-          else
-            {
-              // Data arriving on an already-connected socket.
-              if (readSocket(i, radio) < 0)
-                {
-                  printf("\nClose socket: %d...\n", i);
-                  close (i);
-                  FD_CLR (i, &active_fd_set);
-                }
-            }
+      if (FD_ISSET (i, &read_fd_set)) {
+        if (i == sock) {
+          // Connection request on original socket.
+          int new_client;
+          size = sizeof (clientname);
+          new_client = accept (sock,
+                        (struct sockaddr *) &clientname,
+                        &size);
+          if (new_client < 0) {
+            perror ("accept");
+            exit (EXIT_FAILURE);
+          }
+          printf("Server: connect from host %s, port %hd.\n",
+                inet_ntoa (clientname.sin_addr),
+                ntohs (clientname.sin_port));
+          FD_SET (new_client, &active_fd_set);
+        } else {
+          // Data arriving on an already-connected socket.
+          if (readSocket(i, radio) < 0) {
+            printf("\nClose socket: %d...\n", i);
+            close (i);
+            FD_CLR (i, &active_fd_set);
+          }
         }
       }
-
-
-
-      // Handle any messages from the radio
-      while (radio.available()) {
-        char payload[PAYLOAD_SIZE];
-        radio.read(&payload, PAYLOAD_SIZE);
-        // Dump it to screen
-        printf("payload:%hd\n", payload);
-        // Tell all who care
-        sendMessageToRadios(payload, radio, 0);
-      }
-
-
     }
+
+    // Handle any messages from the radio
+    while (radio.available()) {
+      char payload[PAYLOAD_SIZE];
+      radio.read(&payload, PAYLOAD_SIZE);
+      // Dump it to screen
+      printf("payload:%hd\n", payload);
+      // Tell all who care
+      sendMessageToRadios(payload, radio, 0);
+    }
+
+  }
 
 }
 
