@@ -29,6 +29,9 @@
 #define PIN_CE  7
 #define PIN_CSN 8
 
+// Fixed size payload
+#define PAYLOAD_SIZE 16
+
 RF24 radio(PIN_CE, PIN_CSN);
 
 // The address that this node listens on
@@ -36,6 +39,9 @@ byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
 
 int ack = 0;
+
+uint8_t msg_type = 'I';
+uint8_t msg_id = 0;
 
 // the pin used for the infrared receiver 
 int RECV_PIN = 2;
@@ -90,16 +96,13 @@ void loop(void)
       radio.writeAckPayload(1, &ack, sizeof(ack));
       ack++;
       
-      int got_val; 
-      radio.read( &got_val, sizeof(got_val));    
+      uint8_t msg[PAYLOAD_SIZE];
+      radio.read( &msg, PAYLOAD_SIZE);    
       
    
-      printf("Got: %d \n\r", got_val);
+      printf("Got: %s \n\r", msg);
+      processMessage(msg);
       
-      if (got_val > 0) {
-        
-        //@todo: process commands...
-      }
     }
   }
   
@@ -107,18 +110,29 @@ void loop(void)
   // Check for a new IR code
   if (irrecv.decode(&results)) {
     // Cet the button name for the received code
-    int send_val = irGetButton(results.value);
+    uint8_t send_val = irGetButton(results.value);
     
     if (send_val > 0) {
       radio.stopListening();
+      
+      // Prepare the message.
+      uint8_t msg[PAYLOAD_SIZE];
+      // byte 0 = Message type
+      msg[0] = msg_type;
+      // byte 1 = Message id
+      msg[1] = msg_id;
+      // byte 2 = high byte of the int
+      msg[2] = 0;
+      // byte 3 = low byte of the int
+      msg[3] = send_val;
+      // Rest of the bytes are junk
 
-      printf("sending %d\n\r", send_val);    
-      if (!radio.write( &send_val, sizeof(int))) {  
-        // Mmm always says fail but it's not actually failing.
-        // Something to do with ACK maybe?
+      printf("sending %s\n\r", msg);    
+      if (!radio.write( &msg, PAYLOAD_SIZE)) { 
         printf(" failed.\n\r"); 
       }
       
+      msg_id++; // Let it overflow
       radio.startListening(); 
     }
     // Start receiving codes again
@@ -128,13 +142,23 @@ void loop(void)
   
 }
 
+void processMessage(uint8_t msg[PAYLOAD_SIZE])
+{
+  // byte 0 = Message type
+  // byte 1 = Message id (not unique as it is 0 to 254)
+  // byte 2 & 3 = uint16_t (int)
+  // rest ignored
+  int cmd = (msg[2] << 8) | msg[3];
+  printf("Got: %hd, %hd, %d \n", msg[0], msg[1], cmd);    
+}
+
 /**
- * The button (int code)
+ * The command for the button pressed
  */
-int irGetButton(unsigned long code)
+uint8_t irGetButton(unsigned long code)
 {
   
-  int val = 0;
+  uint8_t val = 0;
   
   /* Character array used to hold the received button name */
   char CodeName[3];
@@ -264,7 +288,7 @@ int irGetButton(unsigned long code)
     break;
   }
   
-  Serial.println(CodeName);
+  //Serial.println(CodeName);
   return val;
 }
 
