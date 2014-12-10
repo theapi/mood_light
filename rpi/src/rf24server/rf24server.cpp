@@ -117,9 +117,9 @@ int makeSocket(uint16_t port)
 /**
  * Send it to the clients via the nRF24L01+.
  */
-int sendMessageToRadios(uint8_t msg[PAYLOAD_SIZE], RF24 radio, int sock)
+int sendMessageToRadios(char msg[PAYLOAD_SIZE], RF24 radio, int sock)
 {
-  fprintf ("%s:\n", msg);
+  printf ("%s:\n", msg);
   for (int i = 0; i < num_clients; i++) {
     // Send message to the node on the pipe address
     radio.stopListening();
@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
       char payload[PAYLOAD_SIZE];
       radio.read(&payload, PAYLOAD_SIZE);
       // Dump it to screen
-      printf("payload:%hd\n", payload);
+      printf("payload:%s\n", payload);
       // Tell all who care
       sendMessageToRadios(payload, radio, 0);
     }
