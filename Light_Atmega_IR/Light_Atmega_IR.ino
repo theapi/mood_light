@@ -30,7 +30,7 @@
 #define PIN_CSN 8
 
 // Fixed size payload
-#define PAYLOAD_SIZE 16
+#define PAYLOAD_SIZE 18
 
 RF24 radio(PIN_CE, PIN_CSN);
 
