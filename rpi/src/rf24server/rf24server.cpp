@@ -3,13 +3,8 @@
  * A socket server that listens for mumerical commands
  * and forwards them to listening nRF24L01+ nodes.
  *
- * Normally this is stateless so one number sent per connection.
- *
- * To keep the connection open the first command must be 2
- *   to which the response will be 201
- * To close a connection opened with the "2" command, send 3
- *
- * Any number greater than 31 is passed to the listening nodes.
+ * If it has been possible to write to the radio receiver
+ * the return code will be 200.
  *
  * If it has not been possible to write to the radio receiver
  * the return code will be 504.
@@ -39,8 +34,9 @@
 #include <string>
 #include <RF24/RF24.h>
 
-// Maximum size of incomming message
-#define MAXMSG  32
+
+// Size of messages sent to the radios in bytes
+#define PAYLOAD_SIZE 16
 
 using namespace std;
 //
@@ -80,7 +76,7 @@ void error(const char *msg)
   exit(1);
 }
 
-int make_socket (uint16_t port)
+int makesocket(uint16_t port)
 {
   int sock;
   struct sockaddr_in name;
@@ -106,7 +102,7 @@ int make_socket (uint16_t port)
   return sock;
 }
 
-int handleCode(short code, RF24 radio, int sock)
+int sendMessageToRadios(uint8_t msg[PAYLOAD_SIZE], RF24 radio, int sock)
 {
   // Response codes are http status codes.
   if (code > 0) {
@@ -126,13 +122,13 @@ int handleCode(short code, RF24 radio, int sock)
         // NB: seems to be that it does not send the same message twice in a row
         // BUT radio.write still returns true AND the ack payload is the same as last time.
 
-        bool ok = radio.write( &code, 2 );
+        bool ok = radio.write( &code, PAYLOAD_SIZE );
         if (!ok) {
           respond(sock, "504");
           printf("(0)");
         } else {
 
-          // If an ack with payload was received
+          // If an ack with payload of 2 bytes was received
           while (radio.available()) {
             short ack_payload;
             radio.read( &ack_payload, sizeof(ack_payload));
@@ -153,60 +149,40 @@ int handleCode(short code, RF24 radio, int sock)
     } else if (code == 3) {
       // Close the connection
       return -1;
-    } else if (code == 2) {
-      // Keep the connection open
-      if (!respond(sock, "201")) {
-        return -1;
-      }
     }
 
   }
   return 0;
 }
 
-int read_from_client (int sock, RF24 radio)
+int readSocket(int sock, RF24 radio)
 {
-  char buffer[MAXMSG];
+  char buffer[PAYLOAD_SIZE];
   int nbytes;
 
-  bzero(buffer, MAXMSG);
-  nbytes = read (sock, buffer, MAXMSG);
+  bzero(buffer, PAYLOAD_SIZE);
+  nbytes = read (sock, buffer, PAYLOAD_SIZE);
   if (nbytes < 0)
     {
-      /* Read error. */
+      // Read error.
       perror ("read");
       exit (EXIT_FAILURE);
     }
   else if (nbytes == 0)
-    /* End-of-file. */
+    // End-of-file.
     return -1;
   else
     {
-      /* Data read. */
+      // Data read.
       //fprintf (stderr, "Server: got message: `%s'\n", buffer);
-
-
-      // Take the input as an int,
-      // chop it to a short (2 bytes).
-      // So maximum code number is 32767 (int on 16bit arduino)
-      short code = atoi(buffer);
-
-      return handleCode(code, radio, sock);
+      return sendMessageToRadios(buffer, radio, sock);
     }
 }
 
 
 int main(int argc, char *argv[])
 {
-
-  //signal(SIGCHLD, SIG_IGN); // No zombies
-
   uint16_t port;
-  /*
-  int sockfd, newsockfd, portno, pid;
-  socklen_t clilen;
-  struct sockaddr_in serv_addr, cli_addr;
-*/
 
   if (argc < 2) {
      fprintf(stderr,"ERROR, no port provided\n");
@@ -223,7 +199,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  extern int make_socket (uint16_t port);
+  extern int makesocket(uint16_t port);
   int sock;
   fd_set active_fd_set, read_fd_set;
   int i;
@@ -232,7 +208,7 @@ int main(int argc, char *argv[])
   struct timeval tv;
 
   /* Create the socket and set it up to accept connections. */
-  sock = make_socket (port);
+  sock = makesocket(port);
   if (listen (sock, 1) < 0)
     {
       perror ("listen");
@@ -255,7 +231,7 @@ int main(int argc, char *argv[])
   // Setup and configure rf radio
   radio.begin();
   // 2 byte payload
-  radio.setPayloadSize(2);
+  radio.setPayloadSize(PAYLOAD_SIZE);
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
   // Allow optional ack payloads
@@ -310,7 +286,7 @@ int main(int argc, char *argv[])
           else
             {
               // Data arriving on an already-connected socket.
-              if (read_from_client (i, radio) < 0)
+              if (readSocket(i, radio) < 0)
                 {
                   printf("\nClose socket: %d...\n", i);
                   close (i);
@@ -324,12 +300,12 @@ int main(int argc, char *argv[])
 
       // Handle any messages from the radio
       while (radio.available()) {
-        short payload;
-        radio.read( &payload, sizeof(payload) );
+        char payload[PAYLOAD_SIZE];
+        radio.read(&payload, PAYLOAD_SIZE);
         // Dump it to screen
         printf("payload:%hd\n", payload);
         // Tell all who care
-        handleCode(payload, radio, 0);
+        sendMessageToRadios(payload, radio, 0);
       }
 
 
