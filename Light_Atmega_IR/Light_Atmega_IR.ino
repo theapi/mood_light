@@ -30,7 +30,7 @@
 #define PIN_CSN 8
 
 // Fixed size payload
-#define PAYLOAD_SIZE 18
+//#define PAYLOAD_SIZE 18
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -40,8 +40,21 @@ byte address_base[6] = BASE_ADDRESS;
 
 int ack = 0;
 
-uint8_t msg_type = 'I';
-uint8_t msg_id = 0;
+typedef struct{
+  char type;
+  uint16_t timestamp;
+  short a;
+  short b;
+  short c;
+  short d;
+  short e;
+  short f;
+}
+payload_t;
+payload_t message;
+
+//uint8_t msg_type = 'I';
+//uint8_t msg_id = 0;
 
 // the pin used for the infrared receiver 
 int RECV_PIN = 2;
@@ -63,7 +76,7 @@ void setup()
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(2);                // Only two byte payload gets sent (int on arduino) (short on 32bit rpi)
+  radio.setPayloadSize(sizeof(message));               
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
   // Allow optional ack payloads
@@ -90,23 +103,21 @@ void loop(void)
   // Check for a message from the controller
   if (radio.available()) {
     // Get the payload
+    // Create the ack payload for the NEXT message.
+    radio.writeAckPayload(1, &ack, sizeof(ack));
+    ack++; 
 
-    while (radio.available()) {   
-      // Create the ack payload for the NEXT message.
-      radio.writeAckPayload(1, &ack, sizeof(ack));
-      ack++;
+      radio.read( &message, sizeof(message));    
       
-      uint8_t msg[PAYLOAD_SIZE];
-      radio.read( &msg, PAYLOAD_SIZE);    
-      
+      //Serial.println(message.A);
    
-      printf("Got: %s \n\r", msg);
-      processMessage(msg);
-      
-    }
+      printf("Got: %c %lu \n\r", message.type, message.timestamp);
+      //delay(100);
+      //processMessage(msg);
+
   }
   
-  
+  /*
   // Check for a new IR code
   if (irrecv.decode(&results)) {
     // Cet the button name for the received code
@@ -116,19 +127,21 @@ void loop(void)
       radio.stopListening();
       
       // Prepare the message.
-      uint8_t msg[PAYLOAD_SIZE];
       // byte 0 = Message type
-      msg[0] = msg_type;
+      data[0] = msg_type;
       // byte 1 = Message id
-      msg[1] = msg_id;
+      data[1] = 'P';
       // byte 2 = high byte of the int
-      msg[2] = 0;
+      data[2] = 'E';
       // byte 3 = low byte of the int
-      msg[3] = send_val;
+      data[3] = 'T';
       // Rest of the bytes are junk
+//Serial.println(msg[1]);
 
-      printf("sending %s\n\r", msg);    
-      if (!radio.write( &msg, PAYLOAD_SIZE)) { 
+
+
+      printf("sending %s\n\r", data);    
+      if (!radio.write( &data, PAYLOAD_SIZE)) { 
         printf(" failed.\n\r"); 
       }
       
@@ -139,19 +152,23 @@ void loop(void)
     irrecv.resume();
     
   }
+  */
   
 }
-
+/*
 void processMessage(uint8_t msg[PAYLOAD_SIZE])
 {
+  printf("Got: %s\n\r", msg);  
+  
+  
   // byte 0 = Message type
   // byte 1 = Message id (not unique as it is 0 to 254)
   // byte 2 & 3 = uint16_t (int)
   // rest ignored
-  int cmd = (msg[2] << 8) | msg[3];
-  printf("Got: %hd, %hd, %d \n", msg[0], msg[1], cmd);    
+  //int cmd = (msg[2] << 8) | msg[3];
+  //printf("Parsed: %hd, %hd, %d \n", msg[0], msg[1], cmd);    
 }
-
+*/
 /**
  * The command for the button pressed
  */
@@ -171,7 +188,7 @@ uint8_t irGetButton(unsigned long code)
   }
   /* Save this code incase we get a repeat code next time */
   LastCode = code;
-  Serial.println(code, HEX);
+  //Serial.println(code, HEX);
 
   // ASCII
   
