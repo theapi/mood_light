@@ -68,6 +68,18 @@ uint8_t num_clients_max = 7;
 // Radio pipes
 const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
+typedef struct{
+  char type;
+  uint16_t timestamp;
+  short a;
+  short b;
+  short c;
+  short d;
+  short e;
+  short f;
+}
+payload_t;
+payload_t send_message;
 
 void error(const char *msg)
 {
@@ -119,9 +131,12 @@ int makeSocket(uint16_t port)
 /**
  * Send it to the clients via the nRF24L01+.
  */
-int sendMessageToRadios(char msg[PAYLOAD_SIZE], RF24 radio, int sock)
+int sendMessageToRadios(payload_t message, RF24 radio, int sock)
 {
-  printf ("%s:\n", msg);
+  printf ("%c %d:\n", message.type, message.timestamp);
+
+
+
   for (int i = 0; i < num_clients; i++) {
     // Send message to the node on the pipe address
     radio.stopListening();
@@ -133,7 +148,7 @@ int sendMessageToRadios(char msg[PAYLOAD_SIZE], RF24 radio, int sock)
     // NB: seems to be that it does not send the same message twice in a row
     // BUT radio.write still returns true AND the ack payload is the same as last time.
 
-    bool ok = radio.write( &msg, PAYLOAD_SIZE );
+    bool ok = radio.write( &message, sizeof(message));
     if (!ok) {
       respond(sock, "504");
       printf("(0)");
@@ -182,8 +197,13 @@ int readSocket(int sock, RF24 radio)
       return -1;
     }
 
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    send_message.type = 'X';
+    send_message.timestamp = tv.tv_sec;
+
     // Pass the message to the radios.
-    return sendMessageToRadios(buffer, radio, sock);
+    return sendMessageToRadios(send_message, radio, sock);
   }
 }
 
@@ -237,7 +257,7 @@ int main(int argc, char *argv[])
   // Setup and configure rf radio
   radio.begin();
   // 2 byte payload
-  radio.setPayloadSize(PAYLOAD_SIZE);
+  radio.setPayloadSize(sizeof(send_message));
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
   // Allow optional ack payloads
@@ -297,12 +317,11 @@ int main(int argc, char *argv[])
 
     // Handle any messages from the radio
     while (radio.available()) {
-      char payload[PAYLOAD_SIZE];
-      radio.read(&payload, PAYLOAD_SIZE);
+      radio.read(&send_message, sizeof(send_message));
       // Dump it to screen
-      printf("payload:%s\n", payload);
+      printf("payload:%c %d\n", send_message.type, send_message.timestamp);
       // Tell all who care
-      sendMessageToRadios(payload, radio, 0);
+      sendMessageToRadios(send_message, radio, 0);
     }
 
   }
