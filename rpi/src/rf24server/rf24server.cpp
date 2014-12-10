@@ -66,9 +66,6 @@ uint8_t num_clients_max = 7;
 // Radio pipes
 const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
-void dostuff(int); /* function prototype */
-int communicate(int, bool&);
-bool respond(int, const char*);
 
 void error(const char *msg)
 {
@@ -76,7 +73,24 @@ void error(const char *msg)
   exit(1);
 }
 
-int makesocket(uint16_t port)
+/**
+ * Send the 3 character response and check for failure.
+ */
+bool respond(int sock, const char *msg)
+{
+  if (sock < 1) {
+    // Pretent it was sent
+    return 0;
+  }
+  int n = write(sock, msg, 3);
+  if (n < 0) {
+    error("ERROR writing to socket");
+    return 0;
+  }
+  return 1;
+}
+
+int makeSocket(uint16_t port)
 {
   int sock;
   struct sockaddr_in name;
@@ -102,56 +116,47 @@ int makesocket(uint16_t port)
   return sock;
 }
 
+/**
+ * Send it to the clients via the nRF24L01+.
+ */
 int sendMessageToRadios(uint8_t msg[PAYLOAD_SIZE], RF24 radio, int sock)
 {
-  // Response codes are http status codes.
-  if (code > 0) {
+  fprintf ("%s:\n", msg);
+  for (int i = 0; i < num_clients; i++) {
+    // Send message to the node on the pipe address
+    radio.stopListening();
+    radio.openWritingPipe(radio_clients[i]);
 
-    // Handle the code
-    if (code > 31) {
-      printf("%hd:", code);
-      // Send it to the clients via the nRF24L01+.
-      for (int i = 0; i < num_clients; i++) {
-        // Send message to the node on the pipe address
-        radio.stopListening();
-        radio.openWritingPipe(radio_clients[i]);
+    //printf("\n%s -> %hd", radio_clients[i], code);
+    printf(" %s ", radio_clients[i]);
 
-        //printf("\n%s -> %hd", radio_clients[i], code);
-        printf(" %s ", radio_clients[i]);
+    // NB: seems to be that it does not send the same message twice in a row
+    // BUT radio.write still returns true AND the ack payload is the same as last time.
 
-        // NB: seems to be that it does not send the same message twice in a row
-        // BUT radio.write still returns true AND the ack payload is the same as last time.
+    bool ok = radio.write( &msg, PAYLOAD_SIZE );
+    if (!ok) {
+      respond(sock, "504");
+      printf("(0)");
+    } else {
 
-        bool ok = radio.write( &code, PAYLOAD_SIZE );
-        if (!ok) {
-          respond(sock, "504");
-          printf("(0)");
-        } else {
-
-          // If an ack with payload of 2 bytes was received
-          while (radio.available()) {
-            short ack_payload;
-            radio.read( &ack_payload, sizeof(ack_payload));
-            // just dump it to screen for now.
-            printf("ack:%hd", ack_payload);
-          }
-
-          respond(sock, "200");
-          printf("(1)");
-        }
-
-        // Continue listening
-        radio.startListening();
-
+      // If an ack with payload of 2 bytes was received
+      while (radio.available()) {
+        short ack_payload;
+        radio.read( &ack_payload, sizeof(ack_payload));
+        // just dump it to screen for now.
+        printf("ack:%hd", ack_payload);
       }
-      printf("\n");
 
-    } else if (code == 3) {
-      // Close the connection
-      return -1;
+      respond(sock, "200");
+      printf("(1)");
     }
 
+    // Continue listening
+    radio.startListening();
+
   }
+  printf("\n");
+
   return 0;
 }
 
@@ -162,27 +167,37 @@ int readSocket(int sock, RF24 radio)
 
   bzero(buffer, PAYLOAD_SIZE);
   nbytes = read (sock, buffer, PAYLOAD_SIZE);
-  if (nbytes < 0)
-    {
+  if (nbytes < 0) {
       // Read error.
       perror ("read");
       exit (EXIT_FAILURE);
-    }
-  else if (nbytes == 0)
+  } else if (nbytes == 0) {
     // End-of-file.
     return -1;
-  else
-    {
-      // Data read.
-      //fprintf (stderr, "Server: got message: `%s'\n", buffer);
-      return sendMessageToRadios(buffer, radio, sock);
+  } else {
+    // Send "exit" to close the connection
+    char *pos = strstr(buffer, "exit");
+    if (pos - buffer == 0) {
+      printf("Got: bye\n");
+      return -1;
     }
+
+    // Pass the message to the radios.
+    return sendMessageToRadios(buffer, radio, sock);
+  }
 }
 
 
 int main(int argc, char *argv[])
 {
   uint16_t port;
+  extern int makeSocket(uint16_t port);
+  int sock;
+  fd_set active_fd_set, read_fd_set;
+  int i;
+  struct sockaddr_in clientname;
+  size_t size;
+  struct timeval tv;
 
   if (argc < 2) {
      fprintf(stderr,"ERROR, no port provided\n");
@@ -199,23 +214,15 @@ int main(int argc, char *argv[])
     }
   }
 
-  extern int makesocket(uint16_t port);
-  int sock;
-  fd_set active_fd_set, read_fd_set;
-  int i;
-  struct sockaddr_in clientname;
-  size_t size;
-  struct timeval tv;
-
-  /* Create the socket and set it up to accept connections. */
-  sock = makesocket(port);
+  // Create the socket and set it up to accept connections.
+  sock = makeSocket(port);
   if (listen (sock, 1) < 0)
     {
       perror ("listen");
       exit (EXIT_FAILURE);
     }
 
-  /* Initialize the set of active sockets. */
+  // Initialize the set of active sockets.
   FD_ZERO (&active_fd_set);
   FD_SET (sock, &active_fd_set);
 
@@ -313,19 +320,4 @@ int main(int argc, char *argv[])
 
 }
 
-/**
- * Send the 3 character response and check for failure.
- */
-bool respond(int sock, const char *msg)
-{
-  if (sock < 1) {
-    // Pretent it was sent
-    return 0;
-  }
-  int n = write(sock, msg, 3);
-  if (n < 0) {
-    error("ERROR writing to socket");
-    return 0;
-  }
-  return 1;
-}
+
