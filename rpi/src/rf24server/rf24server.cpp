@@ -38,7 +38,7 @@
 // Size of messages sent to the radios in bytes
 // According to https://www.youtube.com/watch?v=5Xhvphsj1ms&list=UUTXOorupCLqqQifs2jbz7rQ
 // 8-16 byte payload is no good, 18 is good though.
-#define PAYLOAD_SIZE 18
+#define MAX_PAYLOAD_SIZE 18
 
 using namespace std;
 //
@@ -177,11 +177,11 @@ int sendMessageToRadios(payload_t message, RF24 radio, int sock)
 
 int readSocket(int sock, RF24 radio)
 {
-  char buffer[PAYLOAD_SIZE];
+  char buffer[MAX_PAYLOAD_SIZE];
   int nbytes;
 
-  bzero(buffer, PAYLOAD_SIZE);
-  nbytes = read (sock, buffer, PAYLOAD_SIZE);
+  bzero(buffer, MAX_PAYLOAD_SIZE);
+  nbytes = read (sock, buffer, MAX_PAYLOAD_SIZE);
   if (nbytes < 0) {
       // Read error.
       perror ("read");
@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
   // Setup and configure rf radio
   radio.begin();
   // 2 byte payload
-  radio.setPayloadSize(sizeof(send_message));
+  radio.setPayloadSize(MAX_PAYLOAD_SIZE);
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
   // Allow optional ack payloads

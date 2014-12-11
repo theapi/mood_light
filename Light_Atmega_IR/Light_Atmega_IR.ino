@@ -30,7 +30,7 @@
 #define PIN_CSN 8
 
 // Fixed size payload
-//#define PAYLOAD_SIZE 18
+#define MAX_PAYLOAD_SIZE 18
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -40,6 +40,13 @@ byte address_base[6] = BASE_ADDRESS;
 
 int ack = 0;
 
+/**
+ * sizeof(payload_t) must be <= MAX_PAYLOAD_SIZE
+ * @see RF24.h bool write()
+ * The maximum size of data written is the fixed payload size, see
+ * getPayloadSize().  However, you can write less, and the remainder
+ * will just be filled with zeroes.
+*/
 typedef struct{
   char type;
   uint16_t timestamp;
@@ -76,7 +83,7 @@ void setup()
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(sizeof(message));               
+  radio.setPayloadSize(MAX_PAYLOAD_SIZE);               
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
   // Allow optional ack payloads
