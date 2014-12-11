@@ -68,6 +68,8 @@ uint8_t num_clients_max = 7;
 // Radio pipes
 const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
+uint16_t msg_id = 0;
+
 /**
  * sizeof(payload_t) must be <= MAX_PAYLOAD_SIZE
  * @see RF24.h bool write()
@@ -208,9 +210,16 @@ int readSocket(int sock)
     struct timeval tv;
     gettimeofday(&tv,NULL);
 
+    // Pretty much hardcoded payload for now
     payload_t payload;
-    payload.type = 'X';
+    payload.device_id = 'X';
+    payload.vcc = 0; // no vcc on the server
+    payload.type = 'X'; // transfer from internet/socket
     payload.timestamp = tv.tv_sec;
+    payload.msg_id = msg_id;
+    payload.a = atoi(buffer); // Just create an int from whatever came in
+
+    msg_id++; // Let it overflow
 
     // Pass the message to the radios.
     return sendPayloadToRadios(payload, sock);
