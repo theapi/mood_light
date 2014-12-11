@@ -68,6 +68,7 @@ uint8_t num_clients_max = 7;
 // Radio pipes
 const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
+uint8_t test_mode = 0;
 uint16_t msg_id = 0;
 
 /**
@@ -185,6 +186,23 @@ int sendPayloadToRadios(payload_t payload, int sock)
   return 0;
 }
 
+payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
+{
+  payload_t payload;
+
+  payload.device_id = buf[0];
+  payload.type = buf[1];
+  payload.msg_id = (buf[2] << 8) | buf[3];
+  payload.timestamp = (buf[4] << 8) | buf[5];
+  payload.vcc = (buf[6] << 8) | buf[7];
+  payload.a = (buf[8] << 8) | buf[9];
+  payload.b = (buf[10] << 8) | buf[11];
+  payload.c = (buf[12] << 8) | buf[13];
+  payload.d = (buf[14] << 8) | buf[15];
+
+  return payload;
+}
+
 int readSocket(int sock)
 {
   char buffer[MAX_PAYLOAD_SIZE];
@@ -210,16 +228,21 @@ int readSocket(int sock)
     struct timeval tv;
     gettimeofday(&tv,NULL);
 
-    // Pretty much hardcoded payload for now
     payload_t payload;
-    payload.device_id = 'X';
-    payload.vcc = 0; // no vcc on the server
-    payload.type = 'X'; // transfer from internet/socket
-    payload.timestamp = tv.tv_sec;
-    payload.msg_id = msg_id;
-    payload.a = atoi(buffer); // Just create an int from whatever came in
+    if (test_mode) {
+      // Pretty much hardcoded payload except for atoi(buffer)
+      payload.device_id = 'X';
+      payload.vcc = 0; // no vcc on the server
+      payload.type = 'X'; // transfer from internet/socket
+      payload.timestamp = tv.tv_sec;
+      payload.msg_id = msg_id;
+      payload.a = atoi(buffer); // Just create an int from whatever came in
 
-    msg_id++; // Let it overflow
+      msg_id++; // Let it overflow
+    } else {
+      // The socket should be providing payload data.
+      payload = parseSocketInput(buffer);
+    }
 
     // Pass the message to the radios.
     return sendPayloadToRadios(payload, sock);
@@ -251,6 +274,12 @@ int main(int argc, char *argv[])
     if (num_clients > num_clients_max) {
       num_clients = num_clients_max;
     }
+  }
+
+  // Payload test mode.
+  // eg; sudo ./rf24server.cpp 2000 4 1 (for 2 clients on port 2000)
+  if (argc > 3) {
+    test_mode = atoi(argv[3]);
   }
 
   // Create the socket and set it up to accept connections.
