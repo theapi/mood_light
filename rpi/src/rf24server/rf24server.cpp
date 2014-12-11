@@ -79,7 +79,7 @@ typedef struct{
   short f;
 }
 payload_t;
-payload_t send_message;
+
 
 void error(const char *msg)
 {
@@ -131,9 +131,9 @@ int makeSocket(uint16_t port)
 /**
  * Send it to the clients via the nRF24L01+.
  */
-int sendMessageToRadios(payload_t message, int sock)
+int sendPayloadToRadios(payload_t payload, int sock)
 {
-  printf ("%c %d:\n", message.type, message.timestamp);
+  printf ("%c %d:\n", payload.type, payload.timestamp);
 
 
 
@@ -148,7 +148,7 @@ int sendMessageToRadios(payload_t message, int sock)
     // NB: seems to be that it does not send the same message twice in a row
     // BUT radio.write still returns true AND the ack payload is the same as last time.
 
-    bool ok = radio.write( &message, sizeof(message));
+    bool ok = radio.write( &payload, sizeof(payload));
     if (!ok) {
       respond(sock, "504");
       printf("(0)");
@@ -199,11 +199,13 @@ int readSocket(int sock)
 
     struct timeval tv;
     gettimeofday(&tv,NULL);
-    send_message.type = 'X';
-    send_message.timestamp = tv.tv_sec;
+
+    payload_t payload;
+    payload.type = 'X';
+    payload.timestamp = tv.tv_sec;
 
     // Pass the message to the radios.
-    return sendMessageToRadios(send_message, sock);
+    return sendPayloadToRadios(payload, sock);
   }
 }
 
@@ -317,11 +319,12 @@ int main(int argc, char *argv[])
 
     // Handle any messages from the radio
     while (radio.available()) {
-      radio.read(&send_message, sizeof(send_message));
+      payload_t payload;
+      radio.read(&payload, sizeof(payload));
       // Dump it to screen
-      printf("payload:%c %d\n", send_message.type, send_message.timestamp);
+      printf("payload:%c %d\n", payload.type, payload.timestamp);
       // Tell all who care
-      sendMessageToRadios(send_message, 0);
+      sendPayloadToRadios(payload, 0);
     }
 
   }
