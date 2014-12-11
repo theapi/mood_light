@@ -131,7 +131,7 @@ int makeSocket(uint16_t port)
 /**
  * Send it to the clients via the nRF24L01+.
  */
-int sendMessageToRadios(payload_t message, RF24 radio, int sock)
+int sendMessageToRadios(payload_t message, int sock)
 {
   printf ("%c %d:\n", message.type, message.timestamp);
 
@@ -175,7 +175,7 @@ int sendMessageToRadios(payload_t message, RF24 radio, int sock)
   return 0;
 }
 
-int readSocket(int sock, RF24 radio)
+int readSocket(int sock)
 {
   char buffer[MAX_PAYLOAD_SIZE];
   int nbytes;
@@ -203,7 +203,7 @@ int readSocket(int sock, RF24 radio)
     send_message.timestamp = tv.tv_sec;
 
     // Pass the message to the radios.
-    return sendMessageToRadios(send_message, radio, sock);
+    return sendMessageToRadios(send_message, sock);
   }
 }
 
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
           FD_SET (new_client, &active_fd_set);
         } else {
           // Data arriving on an already-connected socket.
-          if (readSocket(i, radio) < 0) {
+          if (readSocket(i) < 0) {
             printf("\nClose socket: %d...\n", i);
             close (i);
             FD_CLR (i, &active_fd_set);
@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
       // Dump it to screen
       printf("payload:%c %d\n", send_message.type, send_message.timestamp);
       // Tell all who care
-      sendMessageToRadios(send_message, radio, 0);
+      sendMessageToRadios(send_message, 0);
     }
 
   }
