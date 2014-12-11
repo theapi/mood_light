@@ -144,7 +144,7 @@ int makeSocket(uint16_t port)
  */
 int sendPayloadToRadios(payload_t payload, int sock)
 {
-  printf ("%c %d:\n", payload.type, payload.timestamp);
+  printf ("%c %c %d %d %d :\n", payload.device_id, payload.type, payload.msg_id, payload.timestamp, payload.a);
 
 
 
