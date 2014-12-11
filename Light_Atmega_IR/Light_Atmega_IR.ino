@@ -48,14 +48,15 @@ int ack = 0;
  * will just be filled with zeroes.
 */
 typedef struct{
-  char type;
   uint16_t timestamp;
-  short a;
-  short b;
-  short c;
-  short d;
-  short e;
-  short f;
+  uint16_t msgid;
+  uint16_t vcc;
+  uint16_t a;
+  uint16_t b;
+  uint16_t c;
+  uint16_t d;
+  uint8_t type;
+  uint8_t src;
 }
 payload_t;
 payload_t message;

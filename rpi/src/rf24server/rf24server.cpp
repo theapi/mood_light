@@ -68,15 +68,23 @@ uint8_t num_clients_max = 7;
 // Radio pipes
 const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 
+/**
+ * sizeof(payload_t) must be <= MAX_PAYLOAD_SIZE
+ * @see RF24.h bool write()
+ * The maximum size of data written is the fixed payload size, see
+ * getPayloadSize().  However, you can write less, and the remainder
+ * will just be filled with zeroes.
+*/
 typedef struct{
-  char type;
   uint16_t timestamp;
-  short a;
-  short b;
-  short c;
-  short d;
-  short e;
-  short f;
+  uint16_t msgid;
+  uint16_t vcc;
+  uint16_t a;
+  uint16_t b;
+  uint16_t c;
+  uint16_t d;
+  uint8_t type;
+  uint8_t src;
 }
 payload_t;
 
