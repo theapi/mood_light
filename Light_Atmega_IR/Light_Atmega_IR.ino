@@ -9,6 +9,9 @@
  Using the RF24 library from https://github.com/TMRh20/RF24
  
  */
+ 
+#define DEVICE_ID = 'B';
+ 
 //#define RX_ADDRESS "AAAAA"
 #define RX_ADDRESS "BBBBB"
 //#define RX_ADDRESS "CCCCC"
@@ -24,6 +27,7 @@
 #include "printf.h"
 // https://github.com/shirriff/Arduino-IRremote
 #include <IRremote.h>
+
 
 
 #define PIN_CE  7
@@ -49,20 +53,20 @@ int ack = 0;
 */
 typedef struct{
   uint16_t timestamp;
-  uint16_t msgid;
+  uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
   uint16_t b;
   uint16_t c;
   uint16_t d;
   uint8_t type;
-  uint8_t src;
+  uint8_t device_id;
 }
 payload_t;
-payload_t message;
+payload_t payload;
 
-//uint8_t msg_type = 'I';
-//uint8_t msg_id = 0;
+
+uint16_t msg_id = 0;
 
 // the pin used for the infrared receiver 
 int RECV_PIN = 2;
@@ -115,12 +119,8 @@ void loop(void)
     radio.writeAckPayload(1, &ack, sizeof(ack));
     ack++; 
 
-      radio.read( &message, sizeof(message));    
-      
-      //Serial.println(message.A);
-   
-      printf("Got: %c %lu \n\r", message.type, message.timestamp);
-      //delay(100);
+      radio.read( &payload, sizeof(payload));    
+      printf("Got: %c, %lu, %lu, $c \n", payload.type, payload.msg_id, payload.timestamp, payload.device_id);
       //processMessage(msg);
 
   }

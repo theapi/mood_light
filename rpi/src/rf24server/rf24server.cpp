@@ -77,14 +77,14 @@ const uint8_t pipes[][6] = {"1BASE", "2BASE", "3BASE", "4BASE", "5BASE"};
 */
 typedef struct{
   uint16_t timestamp;
-  uint16_t msgid;
+  uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
   uint16_t b;
   uint16_t c;
   uint16_t d;
   uint8_t type;
-  uint8_t src;
+  uint8_t device_id;
 }
 payload_t;
 
