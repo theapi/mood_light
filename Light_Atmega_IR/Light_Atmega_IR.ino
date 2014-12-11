@@ -10,7 +10,7 @@
  
  */
  
-#define DEVICE_ID = 'B';
+#define DEVICE_ID 'B';
  
 //#define RX_ADDRESS "AAAAA"
 #define RX_ADDRESS "BBBBB"
@@ -125,7 +125,7 @@ void loop(void)
 
   }
   
-  /*
+
   // Check for a new IR code
   if (irrecv.decode(&results)) {
     // Cet the button name for the received code
@@ -135,21 +135,16 @@ void loop(void)
       radio.stopListening();
       
       // Prepare the message.
-      // byte 0 = Message type
-      data[0] = msg_type;
-      // byte 1 = Message id
-      data[1] = 'P';
-      // byte 2 = high byte of the int
-      data[2] = 'E';
-      // byte 3 = low byte of the int
-      data[3] = 'T';
-      // Rest of the bytes are junk
-//Serial.println(msg[1]);
-
-
-
-      printf("sending %s\n\r", data);    
-      if (!radio.write( &data, PAYLOAD_SIZE)) { 
+      payload_t payload;
+      payload.device_id = DEVICE_ID;
+      payload.type = 'I';
+      payload.timestamp = millis();
+      payload.msg_id = msg_id;
+      payload.vcc = 0; //@TODO vcc
+      payload.a = send_val;
+      
+      printf("sending $d, %d \n", payload.msg_id, payload.a);    
+      if (!radio.write( &payload, sizeof(payload))) { 
         printf(" failed.\n\r"); 
       }
       
@@ -160,7 +155,7 @@ void loop(void)
     irrecv.resume();
     
   }
-  */
+
   
 }
 /*
