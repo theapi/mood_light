@@ -142,11 +142,11 @@ int makeSocket(uint16_t port)
  */
 int sendPayloadToRadios(payload_t payload, int sock)
 {
-  printf ("%c %c %d %d %d %d %d %d %d:\n", 
-    payload.device_id, 
-    payload.type, 
-    payload.timestamp, 
-    payload.msg_id, 
+  printf ("%c %c %d %d %d %d %d %d %d:\n",
+    payload.device_id,
+    payload.type,
+    payload.timestamp,
+    payload.msg_id,
     payload.vcc,
     payload.a,
     payload.b,
@@ -275,15 +275,14 @@ int readSocket(int sock)
       return -1;
     }
 
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-
-    payload_t payload;
     if (test_mode) {
+      struct timeval tv;
+      gettimeofday(&tv,NULL);
+      payload_t payload;
       // Pretty much hardcoded payload except for atoi(buffer)
-      payload.device_id = 'X';
+      payload.device_id = 'P'; // P for Pi
       payload.vcc = 0; // no vcc on the server
-      payload.type = 'X'; // transfer from internet/socket
+      payload.type = 'T'; // test mode
       payload.timestamp = tv.tv_sec;
       payload.msg_id = msg_id;
       payload.a = atoi(buffer); // Just create an int from whatever came in
