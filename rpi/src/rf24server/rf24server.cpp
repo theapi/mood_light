@@ -275,10 +275,11 @@ int readSocket(int sock)
       return -1;
     }
 
+    payload_t payload;
     if (test_mode) {
       struct timeval tv;
       gettimeofday(&tv,NULL);
-      payload_t payload;
+
       // Pretty much hardcoded payload except for atoi(buffer)
       payload.device_id = 'P'; // P for Pi
       payload.vcc = 0; // no vcc on the server
@@ -286,6 +287,9 @@ int readSocket(int sock)
       payload.timestamp = tv.tv_sec;
       payload.msg_id = msg_id;
       payload.a = atoi(buffer); // Just create an int from whatever came in
+      payload.b = 98;
+      payload.c = 99;
+      payload.d = 100;
 
       msg_id++; // Let it overflow
     } else {
