@@ -34,7 +34,7 @@
 #define PIN_CSN 8
 
 // Fixed size payload
-#define MAX_PAYLOAD_SIZE 18
+#define MAX_PAYLOAD_SIZE 20
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -52,7 +52,7 @@ int ack = 0;
  * will just be filled with zeroes.
 */
 typedef struct{
-  uint16_t timestamp;
+  uint32_t timestamp;
   uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
