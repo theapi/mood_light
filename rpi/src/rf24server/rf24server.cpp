@@ -35,10 +35,8 @@
 #include <RF24/RF24.h>
 
 
-// Size of messages sent to the radios in bytes
-// According to https://www.youtube.com/watch?v=5Xhvphsj1ms&list=UUTXOorupCLqqQifs2jbz7rQ
-// 8-16 byte payload is no good, 18 is good though.
-#define MAX_PAYLOAD_SIZE 18
+#define MAX_PAYLOAD_SIZE 20
+#define MAX_SOCKET_BYTES 255
 
 using namespace std;
 //
@@ -79,7 +77,7 @@ uint16_t msg_id = 0;
  * will just be filled with zeroes.
 */
 typedef struct{
-  uint16_t timestamp;
+  uint32_t timestamp;
   uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
@@ -191,25 +189,57 @@ payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
   payload_t payload;
 
   payload.device_id = buf[0];
-  payload.type = buf[1];
-  payload.msg_id = (buf[2] << 8) | buf[3];
-  payload.timestamp = (buf[4] << 8) | buf[5];
-  payload.vcc = (buf[6] << 8) | buf[7];
-  payload.a = (buf[8] << 8) | buf[9];
-  payload.b = (buf[10] << 8) | buf[11];
-  payload.c = (buf[12] << 8) | buf[13];
-  payload.d = (buf[14] << 8) | buf[15];
+  payload.type = buf[2];
+
+  int i = 0;
+  char *token;
+  token = strtok(buf, ",");
+  while (token != NULL) {
+    //printf("%i: %s\n", i, token);
+    switch (i) {
+      case 2:
+        payload.timestamp = atoi(token);
+        break;
+      case 3:
+        payload.msg_id = atoi(token);
+        break;
+      case 4:
+        payload.vcc = atoi(token);
+        break;
+      case 5:
+        payload.a = atoi(token);
+        break;
+      case 6:
+        payload.b = atoi(token);
+        break;
+      case 7:
+        payload.c = atoi(token);
+        break;
+      case 8:
+        payload.d = atoi(token);
+        break;
+    }
+    i++;
+    token = strtok(NULL, ",");
+  }
+
+  printf("payload.device_id %c\n", payload.device_id);
+  printf("payload.type %c\n", payload.type);
+  printf("payload.timestamp %d\n", payload.timestamp);
+  printf("payload.msg_id %d\n", payload.msg_id);
+  printf("payload.vcc %d\n", payload.vcc);
+  printf("payload.a %d\n", payload.a);
 
   return payload;
 }
 
 int readSocket(int sock)
 {
-  char buffer[MAX_PAYLOAD_SIZE];
+  char buffer[MAX_SOCKET_BYTES];
   int nbytes;
 
-  bzero(buffer, MAX_PAYLOAD_SIZE);
-  nbytes = read (sock, buffer, MAX_PAYLOAD_SIZE);
+  bzero(buffer, MAX_SOCKET_BYTES);
+  nbytes = read (sock, buffer, MAX_SOCKET_BYTES);
   if (nbytes < 0) {
       // Read error.
       perror ("read");
