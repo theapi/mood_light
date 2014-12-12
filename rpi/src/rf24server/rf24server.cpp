@@ -142,7 +142,16 @@ int makeSocket(uint16_t port)
  */
 int sendPayloadToRadios(payload_t payload, int sock)
 {
-  printf ("%c %c %d %d %d :\n", payload.device_id, payload.type, payload.msg_id, payload.timestamp, payload.a);
+  printf ("%c %c %d %d %d %d %d %d %d:\n", 
+    payload.device_id, 
+    payload.type, 
+    payload.timestamp, 
+    payload.msg_id, 
+    payload.vcc,
+    payload.a,
+    payload.b,
+    payload.c,
+    payload.d);
 
 
 
@@ -188,6 +197,17 @@ payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
 {
   payload_t payload;
 
+  // Initialize to some default values
+  payload.device_id = '-';
+  payload.type = '-';
+  payload.timestamp = 0;
+  payload.msg_id = 0;
+  payload.vcc = 0;
+  payload.a = 0;
+  payload.b = 0;
+  payload.c = 0;
+  payload.d = 0;
+
   payload.device_id = buf[0];
   payload.type = buf[2];
 
@@ -222,14 +242,14 @@ payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
     i++;
     token = strtok(NULL, ",");
   }
-
+/*
   printf("payload.device_id %c\n", payload.device_id);
   printf("payload.type %c\n", payload.type);
   printf("payload.timestamp %d\n", payload.timestamp);
   printf("payload.msg_id %d\n", payload.msg_id);
   printf("payload.vcc %d\n", payload.vcc);
   printf("payload.a %d\n", payload.a);
-
+*/
   return payload;
 }
 
