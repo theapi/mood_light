@@ -34,7 +34,7 @@
 #define PIN_CSN 8
 
 // Fixed size payload
-#define MAX_PAYLOAD_SIZE 20
+//#define MAX_PAYLOAD_SIZE 26
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -52,7 +52,7 @@ int ack = 0;
  * will just be filled with zeroes.
 */
 typedef struct{
-  uint32_t timestamp;
+  int32_t timestamp;
   uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
@@ -61,6 +61,8 @@ typedef struct{
   uint16_t d;
   uint8_t type;
   uint8_t device_id;
+  int8_t y;
+  int8_t z;
 }
 payload_t;
 payload_t payload;
@@ -88,7 +90,7 @@ void setup()
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(MAX_PAYLOAD_SIZE);               
+  radio.setPayloadSize(sizeof(payload_t));               
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
   // Allow optional ack payloads
@@ -107,6 +109,9 @@ void setup()
   
   /* Start receiving IR codes */
   irrecv.enableIRIn();
+  
+  Serial.print("Size of payload = ");
+  Serial.println(sizeof(payload));
 }
 
 void loop(void)
@@ -120,7 +125,22 @@ void loop(void)
     ack++; 
 
       radio.read( &payload, sizeof(payload));    
-      printf("Got: %c, %lu, %lu, $c \n", payload.type, payload.msg_id, payload.timestamp, payload.device_id);
+      //printf("Got: %c, %c, %d, %ld, %d \n", payload.type, payload.device_id, payload.msg_id, payload.timestamp, payload.a );
+      
+      printf ("Got: %c %c %ld %d %d %d %d %d %d %d %d \n",
+        payload.device_id,
+        payload.type,
+        payload.timestamp,
+        payload.msg_id,
+        payload.vcc,
+        payload.a,
+        payload.b,
+        payload.c,
+        payload.d,
+        payload.y,
+        payload.z);
+      
+      
       //processMessage(msg);
 
   }
@@ -138,7 +158,7 @@ void loop(void)
       payload_t payload;
       payload.device_id = DEVICE_ID;
       payload.type = 'I';
-      payload.timestamp = millis();
+      //payload.timestamp = millis();
       payload.msg_id = msg_id;
       payload.vcc = 0; //@TODO vcc
       payload.a = send_val;
