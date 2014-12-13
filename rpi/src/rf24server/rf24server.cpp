@@ -240,6 +240,12 @@ payload_t parseSocketInput(char buf[MAX_SOCKET_BYTES])
       case 8:
         payload.d = atoi(token);
         break;
+      case 9:
+        payload.y = atoi(token);
+        break;
+      case 10:
+        payload.z = atoi(token);
+        break;
     }
     i++;
     token = strtok(NULL, ",");
