@@ -35,7 +35,7 @@
 #include <RF24/RF24.h>
 
 
-#define MAX_PAYLOAD_SIZE 20
+//#define MAX_PAYLOAD_SIZE 26
 #define MAX_SOCKET_BYTES 255
 
 using namespace std;
@@ -77,7 +77,7 @@ uint16_t msg_id = 0;
  * will just be filled with zeroes.
 */
 typedef struct{
-  uint32_t timestamp;
+  int32_t timestamp;
   uint16_t msg_id;
   uint16_t vcc;
   uint16_t a;
@@ -86,6 +86,8 @@ typedef struct{
   uint16_t d;
   uint8_t type;
   uint8_t device_id;
+  int8_t y;
+  int8_t z;
 }
 payload_t;
 
@@ -142,7 +144,7 @@ int makeSocket(uint16_t port)
  */
 int sendPayloadToRadios(payload_t payload, int sock)
 {
-  printf ("%c %c %d %d %d %d %d %d %d:\n",
+  printf ("%c %c %d %d %d %d %d %d %d %d %d \n",
     payload.device_id,
     payload.type,
     payload.timestamp,
@@ -151,9 +153,9 @@ int sendPayloadToRadios(payload_t payload, int sock)
     payload.a,
     payload.b,
     payload.c,
-    payload.d);
-
-
+    payload.d,
+    payload.y,
+    payload.z);
 
   for (int i = 0; i < num_clients; i++) {
     // Send message to the node on the pipe address
@@ -193,7 +195,7 @@ int sendPayloadToRadios(payload_t payload, int sock)
   return 0;
 }
 
-payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
+payload_t parseSocketInput(char buf[MAX_SOCKET_BYTES])
 {
   payload_t payload;
 
@@ -207,6 +209,8 @@ payload_t parseSocketInput(char buf[MAX_PAYLOAD_SIZE])
   payload.b = 0;
   payload.c = 0;
   payload.d = 0;
+  payload.y = 0;
+  payload.z = 0;
 
   payload.device_id = buf[0];
   payload.type = buf[2];
@@ -290,6 +294,8 @@ int readSocket(int sock)
       payload.b = 98;
       payload.c = 99;
       payload.d = 100;
+      payload.y = -121;
+      payload.z = -122;
 
       msg_id++; // Let it overflow
     } else {
@@ -358,7 +364,7 @@ int main(int argc, char *argv[])
   // Setup and configure rf radio
   radio.begin();
   // 2 byte payload
-  radio.setPayloadSize(MAX_PAYLOAD_SIZE);
+  radio.setPayloadSize(sizeof(payload_t));
   // Ensure autoACK is enabled
   radio.setAutoAck(1);
   // Allow optional ack payloads
@@ -374,6 +380,8 @@ int main(int argc, char *argv[])
 
   // Dump the configuration of the rf unit for debugging
   radio.printDetails();
+
+  printf("Size of payload = %d\n", sizeof(payload_t));
 
 /**** end rf24 ***/
 
@@ -421,7 +429,7 @@ int main(int argc, char *argv[])
       payload_t payload;
       radio.read(&payload, sizeof(payload));
       // Dump it to screen
-      printf("payload:%c %d\n", payload.type, payload.timestamp);
+      printf("payload:%c %d\n", payload.type, payload.msg_id);
       // Tell all who care
       sendPayloadToRadios(payload, 0);
     }
