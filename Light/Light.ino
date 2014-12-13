@@ -16,6 +16,7 @@
 //#define RX_ADDRESS "CCCCC"
 //#define RX_ADDRESS "DDDDD"
 //#define RX_ADDRESS "EEEEE"
+#define BASE_ADDRESS "1BASE"
 
 #include "RF24.h"
 #include <Adafruit_NeoPixel.h>
@@ -28,6 +29,29 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIN_NEO, NEO_GRB + NEO_KHZ800);
 RF24 radio(PIN_CE, PIN_CSN);
 
 byte address[6] = RX_ADDRESS;
+byte address_base[6] = BASE_ADDRESS;
+int ack = 0;
+
+/**
+ * Be carefull to ensure the struct size is the same as on the Pi.
+ * Just having the same size variables is not enough.
+ * @see http://www.delorie.com/djgpp/v2faq/faq22_11.html
+ */
+typedef struct{
+  int32_t timestamp;
+  uint16_t msg_id;
+  uint16_t vcc;
+  uint16_t a;
+  uint16_t b;
+  uint16_t c;
+  uint16_t d;
+  uint8_t type;
+  uint8_t device_id;
+  int8_t y;
+  int8_t z;
+}
+payload_t;
+payload_t payload;
 
 byte wheel_pos; // the current colour wheel position 
 
@@ -40,9 +64,15 @@ void setup()
   
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(2);                // Only two byte payload gets sent (int)
+  radio.setPayloadSize(sizeof(payload_t));
   radio.setAutoAck(1); // Ensure autoACK is enabled
-  radio.setRetries(15,15); // Max delay between retries & number of retries
+  radio.setRetries(0,15); // Max delay between retries & number of retries
+  // Allow optional ack payloads
+  radio.enableAckPayload();
+  
+  // Pipe for talking to the base
+  radio.openWritingPipe(address_base);
+  
   // Pipe for listening to the base
   radio.openReadingPipe(1, address);
   radio.startListening(); // Start listening
@@ -54,22 +84,25 @@ void loop(void)
   // Check for a message from the controller
   if (radio.available()) {
     // Get the payload
-    int got_val;                 
-    radio.read( &got_val, sizeof(int) );    
-      
-    if (got_val > 0) {
+    // Create the ack payload for the NEXT message.
+    radio.writeAckPayload(1, &ack, sizeof(ack));
+    ack++; 
+
+    radio.read( &payload, sizeof(payload));
+
+    if (payload.a > 0) {
       // Do something...
-      handleMessage(got_val);
+      handleCommand(payload.a);
     }
   }
 }
 
-void handleMessage(int got_val)
+void handleCommand(uint16_t cmd)
 { 
   // NB one pixel for now
   uint16_t i = 0;
 
-  switch(got_val) {
+  switch(cmd) {
     case 48: // 0
     case 99: // C- (c)
       strip.setPixelColor(i, 0, 0, 0);

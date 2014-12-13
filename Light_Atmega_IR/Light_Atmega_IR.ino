@@ -10,6 +10,8 @@
  
  */
  
+#define NUM_PIXELS 16
+ 
 #define DEVICE_ID 'B';
  
 //#define RX_ADDRESS "AAAAA"
@@ -27,21 +29,19 @@
 #include "printf.h"
 // https://github.com/shirriff/Arduino-IRremote
 #include <IRremote.h>
-
+#include <Adafruit_NeoPixel.h>
 
 
 #define PIN_CE  7
 #define PIN_CSN 8
+#define PIN_NEO 6
 
-// Fixed size payload
-//#define MAX_PAYLOAD_SIZE 26
-
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 RF24 radio(PIN_CE, PIN_CSN);
 
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
-
 int ack = 0;
 
 /**
@@ -80,8 +80,13 @@ decode_results results;
 // Used to store the last code received. Used when a repeat code is received
 unsigned long LastCode;
 
+byte wheel_pos; // the current colour wheel position 
+
 void setup() 
 {
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+  
   Serial.begin(57600);
   printf_begin();
   printf("\n\r RF24_Receiver on address: %s \n\r", RX_ADDRESS);
@@ -110,6 +115,8 @@ void setup()
   
   Serial.print("Size of payload = ");
   Serial.println(sizeof(payload));
+  
+  
 }
 
 void loop(void)
@@ -122,24 +129,11 @@ void loop(void)
     radio.writeAckPayload(1, &ack, sizeof(ack));
     ack++; 
 
-      radio.read( &payload, sizeof(payload));    
-      //printf("Got: %c, %c, %d, %ld, %d \n", payload.type, payload.device_id, payload.msg_id, payload.timestamp, payload.a );
-      
-      printf ("Got: %c %c %ld %d %d %d %d %d %d %d %d \n",
-        payload.device_id,
-        payload.type,
-        payload.timestamp,
-        payload.msg_id,
-        payload.vcc,
-        payload.a,
-        payload.b,
-        payload.c,
-        payload.d,
-        payload.y,
-        payload.z);
-      
-      
-      //processMessage(msg);
+    radio.read( &payload, sizeof(payload));    
+    // NB if the sent payload is too long, things go bad.
+    // really need access to RF24::flush_rx(), but that is private.
+
+    processPayload();
 
   }
   
@@ -156,10 +150,15 @@ void loop(void)
       payload_t payload;
       payload.device_id = DEVICE_ID;
       payload.type = 'I';
-      //payload.timestamp = millis();
+      payload.timestamp = millis();
       payload.msg_id = msg_id;
       payload.vcc = 0; //@TODO vcc
       payload.a = send_val;
+      payload.b = 0;
+      payload.c = 0;
+      payload.d = 0;
+      payload.y = 0;
+      payload.z = 0;
       
       printf("sending $d, %d \n", payload.msg_id, payload.a);    
       if (!radio.write( &payload, sizeof(payload))) { 
@@ -176,20 +175,30 @@ void loop(void)
 
   
 }
-/*
-void processMessage(uint8_t msg[PAYLOAD_SIZE])
+
+
+void processPayload()
 {
-  printf("Got: %s\n\r", msg);  
-  
-  
-  // byte 0 = Message type
-  // byte 1 = Message id (not unique as it is 0 to 254)
-  // byte 2 & 3 = uint16_t (int)
-  // rest ignored
-  //int cmd = (msg[2] << 8) | msg[3];
-  //printf("Parsed: %hd, %hd, %d \n", msg[0], msg[1], cmd);    
+  printf ("Got: %c %c %ld %d %d %d %d %d %d %d %d \n",
+    payload.device_id,
+    payload.type,
+    payload.timestamp,
+    payload.msg_id,
+    payload.vcc,
+    payload.a,
+    payload.b,
+    payload.c,
+    payload.d,
+    payload.y,
+    payload.z);
+    
+  if (payload.a > 0) {
+    // Do something...
+    handleCommand(payload.a);
+  }
+   
 }
-*/
+
 /**
  * The command for the button pressed
  */
@@ -330,3 +339,105 @@ uint8_t irGetButton(unsigned long code)
   return val;
 }
 
+void handleCommand(uint16_t cmd)
+{ 
+
+  switch(cmd) {
+    case 48: // 0
+    case 99: // C- (c)
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, 0, 0, 0);
+        strip.show();
+      }
+      break;
+    case 67: // C+ (C)
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+        strip.show();
+      }
+      break;
+    case 49: // 1
+      rainbow(5);
+      break;
+    case 50: // 2
+      rainbowCycle(5);
+      break;
+    case 45: // -
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, Wheel((wheel_pos--) & 255));
+        strip.show();
+      }
+      break;
+    case 43: // +
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, Wheel((wheel_pos++) & 255));
+        strip.show();
+      }
+      break;
+    case 70: // FF (f)
+      wheel_pos+=10;
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+        strip.show();
+      }
+      break;
+    case 82: // RW (R)
+      wheel_pos-=10;
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
+        strip.show();
+      }
+      break;
+    case 57: // 9
+      rainbow(30);
+      break;
+    
+      
+    // @todo A bunch of predifined effects...
+      
+    default:
+      // do nothing
+      break;
+  }
+}
+
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+    delay(wait); // @todo remove the delay.
+  }
+}
+
+
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+   return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else if(WheelPos < 170) {
+    WheelPos -= 85;
+   return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  } else {
+   WheelPos -= 170;
+   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  }
+}
