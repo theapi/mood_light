@@ -70,12 +70,10 @@ uint8_t test_mode = 0;
 uint16_t msg_id = 0;
 
 /**
- * sizeof(payload_t) must be <= MAX_PAYLOAD_SIZE
- * @see RF24.h bool write()
- * The maximum size of data written is the fixed payload size, see
- * getPayloadSize().  However, you can write less, and the remainder
- * will just be filled with zeroes.
-*/
+ * Be carefull to ensure the struct size is the same as on the Pi.
+ * Just having the same size variables is not enough.
+ * @see http://www.delorie.com/djgpp/v2faq/faq22_11.html
+ */
 typedef struct{
   int32_t timestamp;
   uint16_t msg_id;
