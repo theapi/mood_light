@@ -160,6 +160,17 @@ void loop(void)
       payload.y = 0;
       payload.z = 0;
       
+      // experimental robot motor control
+      if (send_val == 43) {
+        // +
+        payload.c = 255 + 85; // left forward
+        payload.d = 85;       // right reverse
+      } else if (send_val == 45) {
+        // -
+        payload.c = 85;       // left reverse
+        payload.d = 255 + 85; // right forward
+      }
+      
       printf("sending %d, %d \n", payload.msg_id, payload.a);
       if (!radio.write( &payload, sizeof(payload))) { 
         printf(" failed.\n\r"); 
