@@ -27,7 +27,7 @@ All pins are used as described in Light.ino
                                  +-\/-+
                    NC      PB5  1|o   |8  Vcc --- nRF24L01  VCC, pin2
              NEO_PIXEL --- PB3  2|    |7  PB2 --- nRF24L01  SCK, pin5
-    nRF24L01 CSN, pin4 --- PB4  3|    |6  PB1 --- nRF24L01 MOSI, pin7
-    nRF24L01 GND, pin1 --- GND  4|    |5  PB0 --- nRF24L01 MISO, pin6
+    nRF24L01 CSN, pin4 --- PB4  3|    |6  PB1 --- nRF24L01 MOSI, pin6
+    nRF24L01 GND, pin1 --- GND  4|    |5  PB0 --- nRF24L01 MISO, pin7
                                  +----+
     nRF24L01 CE, pin3 -- VCC
