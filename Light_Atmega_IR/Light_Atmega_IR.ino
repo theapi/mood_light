@@ -160,7 +160,7 @@ void loop(void)
       payload.y = 0;
       payload.z = 0;
       
-      printf("sending $d, %d \n", payload.msg_id, payload.a);    
+      printf("sending %d, %d \n", payload.msg_id, payload.a);
       if (!radio.write( &payload, sizeof(payload))) { 
         printf(" failed.\n\r"); 
       }

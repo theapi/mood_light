@@ -55,6 +55,7 @@ payload_t payload;
 
 byte wheel_pos; // the current colour wheel position 
 
+byte current_cmd = 0;
 
 void setup() 
 {
@@ -81,6 +82,20 @@ void setup()
 void loop(void)
 {
   
+  if (current_cmd > 0) {
+    switch (current_cmd) {
+      case 52: // 4
+        breath(5000.0, 22, 255, 22);
+        break;
+      case 53: // 5
+        breath(5000.0, 15, 15, 255);
+        break;
+      case 54: // 6
+        breath(5000.0, 255, 255, 25);
+        break;
+    }
+  }
+  
   // Check for a message from the controller
   if (radio.available()) {
     // Get the payload
@@ -101,7 +116,8 @@ void handleCommand(uint16_t cmd)
 { 
   // NB one pixel for now
   uint16_t i = 0;
-
+  current_cmd = 0;
+  
   switch(cmd) {
     case 48: // 0
     case 99: // C- (c)
@@ -112,8 +128,13 @@ void handleCommand(uint16_t cmd)
       strip.setPixelColor(i, Wheel((wheel_pos) & 255));
       strip.show();
       break;
-    case 49:
+    case 49: // 1
       rainbow(5);
+      break;
+    case 52: // 4
+    case 53: // 5
+    case 54: // 6
+      current_cmd = cmd;
       break;
     case 45: // -
       strip.setPixelColor(i, Wheel((wheel_pos--) & 255));
@@ -143,6 +164,23 @@ void handleCommand(uint16_t cmd)
       // do nothing
       break;
   }
+}
+
+
+/**
+ * Gently change the led
+ */
+void breath(float breath_speed, byte red, byte green, byte blue)
+{
+  // http://sean.voisen.org/blog/2011/10/breathing-led-with-arduino/
+  
+  float val = (exp(sin(millis()/ breath_speed *PI)) - 0.36787944)*108.0;
+  val = map(val, 0, 255, 50, 255);
+  
+  
+  strip.setPixelColor(0, map(val, 0, 255, 0, red), map(val, 0, 255, 0, green), map(val, 0, 255, 0, blue));
+  strip.show();
+    
 }
 
 void rainbow(uint8_t wait) {
