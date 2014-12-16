@@ -149,7 +149,7 @@ void loop(void)
       // Prepare the message.
       payload_t payload;
       payload.device_id = DEVICE_ID;
-      payload.type = 'I';
+      payload.type = 'L'; // light command
       payload.timestamp = millis();
       payload.msg_id = msg_id;
       payload.vcc = 0; //@TODO vcc
@@ -357,10 +357,10 @@ void handleCommand(uint16_t cmd)
       }
       break;
     case 49: // 1
-      rainbow(5);
+      //rainbow(5);
       break;
     case 50: // 2
-      rainbowCycle(5);
+      //rainbowCycle(5);
       break;
     case 45: // -
       for (uint16_t i=0; i<strip.numPixels(); i++) {
@@ -389,7 +389,7 @@ void handleCommand(uint16_t cmd)
       }
       break;
     case 57: // 9
-      rainbow(30);
+      //rainbow(30);
       break;
     
       

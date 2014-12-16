@@ -54,8 +54,8 @@ payload_t;
 payload_t payload;
 
 byte wheel_pos; // the current colour wheel position 
-
-byte current_cmd = 0;
+long previousMillis = 0;
+byte current_cmd = 49; // Start with rainbow
 
 void setup() 
 {
@@ -84,6 +84,9 @@ void loop(void)
   
   if (current_cmd > 0) {
     switch (current_cmd) {
+      case 49: // 1
+        rainbow(250);
+        break;
       case 52: // 4
         breath(5000.0, 22, 255, 22);
         break;
@@ -105,7 +108,8 @@ void loop(void)
 
     radio.read( &payload, sizeof(payload));
 
-    if (payload.a > 0) {
+    // Only act on messages of type 'L'
+    if (payload.type == 'L') {
       // Do something...
       handleCommand(payload.a);
     }
@@ -129,7 +133,7 @@ void handleCommand(uint16_t cmd)
       strip.show();
       break;
     case 49: // 1
-      rainbow(5);
+      current_cmd = cmd;
       break;
     case 52: // 4
     case 53: // 5
@@ -155,7 +159,7 @@ void handleCommand(uint16_t cmd)
       strip.show();
       break;
     case 57: // 9
-      rainbow(250);
+      //rainbow(250);
       break;
       
     // @todo A bunch of predifined effects...
@@ -184,14 +188,13 @@ void breath(float breath_speed, byte red, byte green, byte blue)
 }
 
 void rainbow(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
-    }
+  // Rainbow without delay
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis > wait) {
+    previousMillis = currentMillis;
+    wheel_pos+=1; // let it overflow
+    strip.setPixelColor(0, Wheel((wheel_pos) & 255));
     strip.show();
-    delay(wait); // @todo remove the delay.
   }
 }
 
