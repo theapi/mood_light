@@ -1,3 +1,4 @@
+
 /**
 
  Arduino/ATmega328 listening for commands from the central controller, the Raspberry Pi.
@@ -12,7 +13,7 @@
  
 #define NUM_PIXELS 16
  
-#define DEVICE_ID 'B';
+#define DEVICE_ID 'B'
  
 //#define RX_ADDRESS "AAAAA"
 #define RX_ADDRESS "BBBBB"
@@ -30,7 +31,7 @@
 // https://github.com/shirriff/Arduino-IRremote
 #include <IRremote.h>
 #include <Adafruit_NeoPixel.h>
-
+#include <Nrf24Payload.h>
 
 #define PIN_CE  7
 #define PIN_CSN 8
@@ -39,31 +40,14 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, PIN_NEO, NEO_GRB + NEO_KHZ800);
 RF24 radio(PIN_CE, PIN_CSN);
 
+Nrf24Payload rx_payload = Nrf24Payload();
+uint8_t rx[Nrf24Payload_SIZE];
+
+
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
 int ack = 0;
-
-/**
- * Be carefull to ensure the struct size is the same as on the Pi.
- * Just having the same size variables is not enough.
- * @see http://www.delorie.com/djgpp/v2faq/faq22_11.html
- */
-typedef struct{
-  int32_t timestamp;
-  uint16_t msg_id;
-  uint16_t vcc;
-  uint16_t a;
-  uint16_t b;
-  uint16_t c;
-  uint16_t d;
-  uint8_t type;
-  uint8_t device_id;
-  int8_t y;
-  int8_t z;
-}
-payload_t;
-payload_t payload;
 
 
 uint16_t msg_id = 0;
@@ -84,6 +68,7 @@ byte wheel_pos; // the current colour wheel position
 
 void setup() 
 {
+  
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
   
@@ -93,7 +78,7 @@ void setup()
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(sizeof(payload_t));               
+  radio.setPayloadSize(Nrf24Payload_SIZE);               
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
   // Allow optional ack payloads
@@ -114,9 +99,9 @@ void setup()
   irrecv.enableIRIn();
   
   Serial.print("Size of payload = ");
-  Serial.println(sizeof(payload));
-  
-  
+  Serial.println(radio.getPayloadSize());
+
+
 }
 
 void loop(void)
@@ -129,7 +114,8 @@ void loop(void)
     radio.writeAckPayload(1, &ack, sizeof(ack));
     ack++; 
 
-    radio.read( &payload, sizeof(payload));    
+    
+    radio.read( &rx, Nrf24Payload_SIZE);    
     // NB if the sent payload is too long, things go bad.
     // really need access to RF24::flush_rx(), but that is private.
 
@@ -147,36 +133,32 @@ void loop(void)
       radio.stopListening();
       
       // Prepare the message.
-      payload_t payload;
-      payload.device_id = DEVICE_ID;
-      payload.type = 'L'; // light command
-      payload.timestamp = millis();
-      payload.msg_id = msg_id;
-      payload.vcc = 0; //@TODO vcc
-      payload.a = send_val;
-      payload.b = 0;
-      payload.c = 0;
-      payload.d = 0;
-      payload.y = 0;
-      payload.z = 0;
-      
+      Nrf24Payload tx_payload = Nrf24Payload();      
+      tx_payload.setDeviceId(DEVICE_ID);
+      tx_payload.setType('L'); // light command
+      tx_payload.setTimestamp(millis());
+      tx_payload.setId(msg_id++);
+      tx_payload.setA(send_val);
+
+         
       // experimental robot motor control
       if (send_val == 43) {
         // +
-        payload.c = 255 + 85; // left forward
-        payload.d = 85;       // right reverse
+        tx_payload.setC(255 + 85); // left forward
+        tx_payload.setD(85);       // right reverse
       } else if (send_val == 45) {
         // -
-        payload.c = 85;       // left reverse
-        payload.d = 255 + 85; // right forward
+        tx_payload.setC(85); // left reverse
+        tx_payload.setD(255 + 85);       // right forward
       }
       
-      printf("sending %d, %d \n", payload.msg_id, payload.a);
-      if (!radio.write( &payload, sizeof(payload))) { 
+      printf("sending %d, %d \n", tx_payload.getId(), tx_payload.getA());
+      uint8_t tx_buffer[Nrf24Payload_SIZE];
+      tx_payload.serialize(tx_buffer);
+      if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) { 
         printf(" failed.\n\r"); 
       }
       
-      msg_id++; // Let it overflow
       radio.startListening(); 
     }
     // Start receiving codes again
@@ -190,22 +172,23 @@ void loop(void)
 
 void processPayload()
 {
-  printf ("Got: %c %c %ld %d %d %d %d %d %d %d %d \n",
-    payload.device_id,
-    payload.type,
-    payload.timestamp,
-    payload.msg_id,
-    payload.vcc,
-    payload.a,
-    payload.b,
-    payload.c,
-    payload.d,
-    payload.y,
-    payload.z);
+  rx_payload.unserialize(rx);
+  
+  printf ("Got: %c %c %lu %u %u %u %u %u %u %u \n",
+    rx_payload.getDeviceId(),
+    rx_payload.getType(),
+    rx_payload.getTimestamp(),
+    rx_payload.getId(),
+    rx_payload.getVcc(),
+    rx_payload.getA(),
+    rx_payload.getB(),
+    rx_payload.getC(),
+    rx_payload.getD(),
+    rx_payload.getE());
     
-  if (payload.a > 0) {
+  if (rx_payload.getA() > 0) {
     // Do something...
-    handleCommand(payload.a);
+    handleCommand(rx_payload.getA());
   }
    
 }
