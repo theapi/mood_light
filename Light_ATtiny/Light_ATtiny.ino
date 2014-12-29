@@ -20,6 +20,7 @@
 
 #include "RF24.h"
 #include <Adafruit_NeoPixel.h>
+#include <Nrf24Payload.h>
 
 #define PIN_CSN 4
 #define PIN_CE  9 // Fake pin as CE is tied high to always be a primary receiver.
@@ -28,30 +29,14 @@
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, PIN_NEO, NEO_GRB + NEO_KHZ800);
 RF24 radio(PIN_CE, PIN_CSN);
 
+Nrf24Payload rx_payload = Nrf24Payload();
+uint8_t rx[Nrf24Payload_SIZE];
+
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
 int ack = 0;
 
-/**
- * Be carefull to ensure the struct size is the same as on the Pi.
- * Just having the same size variables is not enough.
- * @see http://www.delorie.com/djgpp/v2faq/faq22_11.html
- */
-typedef struct{
-  int32_t timestamp;
-  uint16_t msg_id;
-  uint16_t vcc;
-  uint16_t a;
-  uint16_t b;
-  uint16_t c;
-  uint16_t d;
-  uint8_t type;
-  uint8_t device_id;
-  int8_t y;
-  int8_t z;
-}
-payload_t;
-payload_t payload;
+
 
 byte wheel_pos; // the current colour wheel position 
 long previousMillis = 0;
@@ -65,7 +50,7 @@ void setup()
   
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(sizeof(payload_t));
+  radio.setPayloadSize(Nrf24Payload_SIZE);
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
   // Allow optional ack payloads
@@ -106,12 +91,13 @@ void loop(void)
     radio.writeAckPayload(1, &ack, sizeof(ack));
     ack++; 
 
-    radio.read( &payload, sizeof(payload));
+    radio.read( &rx, Nrf24Payload_SIZE);
+    rx_payload.unserialize(rx);
 
     // Only act on messages of type 'L'
-    if (payload.type == 'L') {
+    if (rx_payload.getType() == 'L') {
       // Do something...
-      handleCommand(payload.a);
+      handleCommand(rx_payload.getA());
     }
   }
 }
