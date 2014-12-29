@@ -3,6 +3,9 @@ Mood Light
 
 Remote controlled light, using NeoPixel &amp; Nrf24L01-2.4GHz
 
+http://theapi.github.io/mood_light/
+-----------------------------------
+
 Hardware
 --------
 Attiny85 8mhz 3.3v
