@@ -1,7 +1,7 @@
 Mood Light 
 ==========
 
-Wireless remote controlled light, using NeoPixel &amp; Nrf24L01-2.4GHz
+Remote controlled light, using NeoPixel &amp; Nrf24L01-2.4GHz
 
 Hardware
 --------
@@ -11,17 +11,19 @@ Nrf24L01-2.4GHz wireless radio transceiver http://arduino-info.wikispaces.com/Nr
 
 NeoPixel https://learn.adafruit.com/adafruit-neopixel-uberguide/overview
 
+Raspberry Pi also with a Nrf24L01-2.4GHz radio module, see https://github.com/theapi/nrf24
+
 
 Software
 --------
 RF24 library https://github.com/TMRh20/RF24
 
+Nrf24Payload library https://github.com/theapi/nrf24
 
 NeoPixel library https://github.com/adafruit/Adafruit_NeoPixel
 
 Setup
 -----
-All pins are used as described in Light.ino
 
     ATtiny25/45/85 Pin map
                                  +-\/-+
