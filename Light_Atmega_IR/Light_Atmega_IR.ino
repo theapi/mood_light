@@ -335,20 +335,22 @@ uint8_t irGetButton(unsigned long code)
 
 void handleCommand(uint16_t cmd)
 { 
+  uint32_t color;
 
   switch(cmd) {
     case 48: // 0
     case 99: // C- (c)
       for (uint16_t i=0; i<strip.numPixels(); i++) {
         strip.setPixelColor(i, 0, 0, 0);
-        strip.show();
       }
+      strip.show();
       break;
     case 67: // C+ (C)
+      color = Wheel((wheel_pos) & 255);
       for (uint16_t i=0; i<strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
-        strip.show();
+        strip.setPixelColor(i, color);
       }
+      strip.show();
       break;
     case 49: // 1
       //rainbow(5);
@@ -357,30 +359,34 @@ void handleCommand(uint16_t cmd)
       //rainbowCycle(5);
       break;
     case 45: // -
+      color = Wheel((wheel_pos--) & 255);
       for (uint16_t i=0; i<strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((wheel_pos--) & 255));
-        strip.show();
+        strip.setPixelColor(i, color);
       }
+      strip.show();
       break;
     case 43: // +
+      color = Wheel((wheel_pos++) & 255);
       for (uint16_t i=0; i<strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((wheel_pos++) & 255));
-        strip.show();
+        strip.setPixelColor(i, color);
       }
+      strip.show();
       break;
     case 70: // FF (f)
       wheel_pos+=10;
+      color = Wheel((wheel_pos) & 255);
       for (uint16_t i=0; i<strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
-        strip.show();
+        strip.setPixelColor(i, color);
       }
+      strip.show();
       break;
     case 82: // RW (R)
       wheel_pos-=10;
+      color = Wheel((wheel_pos) & 255);
       for (uint16_t i=0; i<strip.numPixels(); i++) {
-        strip.setPixelColor(i, Wheel((wheel_pos) & 255));
-        strip.show();
+        strip.setPixelColor(i, color);
       }
+      strip.show();
       break;
     case 57: // 9
       //rainbow(30);
