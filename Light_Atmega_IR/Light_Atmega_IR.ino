@@ -47,8 +47,6 @@ uint8_t rx[Nrf24Payload_SIZE];
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
-int ack = 0;
-
 
 uint16_t msg_id = 0;
 
@@ -80,8 +78,7 @@ void setup()
   radio.setPayloadSize(Nrf24Payload_SIZE);               
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
-  // Allow optional ack payloads
-  radio.enableAckPayload();
+
   
   // Pipe for talking to the base
   radio.openWritingPipe(address_base);
@@ -117,25 +114,20 @@ void loop(void)
         rainbow(250);
         break;
       case 52: // 4
-        breath(5000.0, 22, 255, 22);
+        //breath(5000.0, 22, 255, 22);
         break;
       case 53: // 5
-        breath(5000.0, 15, 15, 255);
+        //breath(5000.0, 15, 15, 255);
         break;
       case 54: // 6
-        breath(5000.0, 255, 255, 25);
+        //breath(5000.0, 255, 255, 25);
         break;
     }
   }
 
   // Check for a message from the controller
   if (radio.available()) {
-    // Get the payload
-    // Create the ack payload for the NEXT message.
-    radio.writeAckPayload(1, &ack, sizeof(ack));
-    ack++; 
-
-    
+    // Get the payload  
     radio.read( &rx, Nrf24Payload_SIZE);    
     // NB if the sent payload is too long, things go bad.
     // really need access to RF24::flush_rx(), but that is private.
@@ -176,7 +168,7 @@ void loop(void)
       uint8_t tx_buffer[Nrf24Payload_SIZE];
       tx_payload.serialize(tx_buffer);
       if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) { 
-        printf(" failed.\n\r"); 
+        printf(" no ack.\n\r"); 
       }
       
       radio.startListening(); 
