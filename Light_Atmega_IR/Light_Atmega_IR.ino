@@ -68,13 +68,10 @@ byte wheel_pos; // the current colour wheel position
 
 void setup() 
 {
-  
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
-  
   Serial.begin(57600);
   printf_begin();
   printf("\n\r RF24_Receiver on address: %s \n\r", RX_ADDRESS);
+
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
@@ -102,6 +99,9 @@ void setup()
   Serial.println(radio.getPayloadSize());
 
 
+  strip.begin();
+  startupDemo();
+  
 }
 
 void loop(void)
@@ -396,6 +396,23 @@ void handleCommand(uint16_t cmd)
       // do nothing
       break;
   }
+}
+
+void startupDemo() {
+  uint16_t i, j;
+
+  for(j=0; j<256*2; j++) { // 2 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(1);
+  }
+  
+  for (uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, 0, 0, 0);
+  }
+  strip.show();
 }
 
 void rainbow(uint8_t wait) {
