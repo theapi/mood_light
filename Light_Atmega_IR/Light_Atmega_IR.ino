@@ -65,6 +65,8 @@ decode_results results;
 unsigned long LastCode;
 
 byte wheel_pos; // the current colour wheel position 
+long previousMillis = 0;
+byte current_cmd = 0;
 
 void setup() 
 {
@@ -106,6 +108,25 @@ void setup()
 
 void loop(void)
 {
+  
+    // State machine
+  
+  if (current_cmd > 0) {
+    switch (current_cmd) {
+      case 49: // 1
+        rainbow(250);
+        break;
+      case 52: // 4
+        breath(5000.0, 22, 255, 22);
+        break;
+      case 53: // 5
+        breath(5000.0, 15, 15, 255);
+        break;
+      case 54: // 6
+        breath(5000.0, 255, 255, 25);
+        break;
+    }
+  }
 
   // Check for a message from the controller
   if (radio.available()) {
@@ -165,6 +186,8 @@ void loop(void)
     
   }
 
+
+  
   
 }
 
@@ -333,6 +356,7 @@ uint8_t irGetButton(unsigned long code)
 void handleCommand(uint16_t cmd)
 { 
   uint32_t color;
+  current_cmd = 0;
 
   switch(cmd) {
     case 48: // 0
@@ -350,10 +374,15 @@ void handleCommand(uint16_t cmd)
       strip.show();
       break;
     case 49: // 1
-      //rainbow(5);
+      current_cmd = cmd;
       break;
     case 50: // 2
       //rainbowCycle(5);
+      break;
+    case 52: // 4
+    case 53: // 5
+    case 54: // 6
+      current_cmd = cmd;
       break;
     case 45: // -
       color = Wheel((wheel_pos--) & 255);
@@ -415,31 +444,42 @@ void startupDemo() {
   strip.show();
 }
 
+/**
+ * Gently change the led
+ */
+void breath(float breath_speed, byte red, byte green, byte blue)
+{
+  // http://sean.voisen.org/blog/2011/10/breathing-led-with-arduino/
+  
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis > 50) {
+    previousMillis = currentMillis;
+    float val = (exp(sin(millis()/ breath_speed *PI)) - 0.36787944)*108.0;
+    val = map(val, 0, 255, 50, 255);
+    
+    for (uint16_t i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, map(val, 0, 255, 0, red), map(val, 0, 255, 0, green), map(val, 0, 255, 0, blue));
+    }
+    strip.show();
+  }
+
+}
+
 void rainbow(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256; j++) {
-    for(i=0; i<strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i+j) & 255));
+  // Rainbow without delay
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis > wait) {
+    previousMillis = currentMillis;
+    
+    uint32_t color = Wheel((wheel_pos++) & 255);
+    for (uint16_t i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, color);
     }
     strip.show();
-    delay(wait); // @todo remove the delay.
+
   }
 }
 
-
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
-    for(i=0; i< strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-    }
-    strip.show();
-    delay(wait);
-  }
-}
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
