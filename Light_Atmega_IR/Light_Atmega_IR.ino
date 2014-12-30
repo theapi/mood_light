@@ -136,7 +136,6 @@ void loop(void)
       Nrf24Payload tx_payload = Nrf24Payload();      
       tx_payload.setDeviceId(DEVICE_ID);
       tx_payload.setType('L'); // light command
-      tx_payload.setTimestamp(millis());
       tx_payload.setId(msg_id++);
       tx_payload.setA(send_val);
 
@@ -174,17 +173,15 @@ void processPayload()
 {
   rx_payload.unserialize(rx);
   
-  printf ("Got: %c %c %lu %u %u %u %u %u %u %u \n",
+  printf ("Got: %c %c %u %u %u %u %u %u \n",
     rx_payload.getDeviceId(),
     rx_payload.getType(),
-    rx_payload.getTimestamp(),
     rx_payload.getId(),
     rx_payload.getVcc(),
     rx_payload.getA(),
     rx_payload.getB(),
     rx_payload.getC(),
-    rx_payload.getD(),
-    rx_payload.getE());
+    rx_payload.getD());
     
   if (rx_payload.getA() > 0) {
     // Do something...
