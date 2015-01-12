@@ -59,8 +59,8 @@ var msg_id = 0;
 
 function init() {
 
-  
-	var host = "ws://io.theapi.co.uk:8080"; // SET THIS TO YOUR SERVER
+    var host = "ws://localhost:8080"; // SET THIS TO YOUR SERVER
+	//var host = "ws://io.theapi.co.uk:8080"; // SET THIS TO YOUR SERVER
 	try {
 		socket = new WebSocket(host);
 		log('WebSocket - status '+socket.readyState);
@@ -143,6 +143,17 @@ function sliderChanged() {
   sendValues();
 }
 
+/**
+ * Send the format expected by the nrf24 server
+ *   payload.getDeviceId(),
+ *   payload.getType(),
+ *   payload.getId(),
+ *   payload.getVcc(),
+ *   payload.getA(),
+ *   payload.getB(),
+ *   payload.getC(),
+ *   payload.getD(),
+ */
 function sendValues(vals) {
   var red = $( "#red" ).slider( "value" );
   var green = $( "#green" ).slider( "value" );
@@ -150,8 +161,8 @@ function sendValues(vals) {
 
   msg_id++;
   
-  // eg; p,t,0,0,23,32767,32768,65534,65535
-  var msg = 'W,l,' + msg_id + ',' + red + ',' + green + ',' + blue + ',' + '0,0';
+  // eg; w,l,1,0,255,255,255,0
+  var msg = 'W,l,0,' + msg_id + ',' + red + ',' + green + ',' + blue + ',' + '0';
   if (socket) {
     try { 
       socket.send(msg); 
