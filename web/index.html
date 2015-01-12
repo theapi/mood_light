@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mood light</title>
+
+  <link rel="stylesheet" href="http://code.jquery.com/ui/1.11.2/themes/smoothness/jquery-ui.css">
+  <script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+  <script src="http://code.jquery.com/ui/1.11.2/jquery-ui.js"></script>
+
+<style type="text/css">
+
+html,body {
+	font:normal 0.9em arial,helvetica;
+}
+#log {
+	width:600px; 
+	height:300px; 
+	border:1px solid #7F9DB9; 
+	overflow:auto;
+	clear:both;
+	margin-top: 40px;
+}
+#msg {
+	width:400px;
+}
+
+pre {
+margin: 0px;
+}
+
+  #red, #green, #blue {
+    float: left;
+    clear: left;
+    width: 300px;
+    margin: 15px;
+  }
+  #swatch {
+    width: 120px;
+    height: 100px;
+    margin-top: 18px;
+    margin-left: 350px;
+    background-image: none;
+  }
+  #red .ui-slider-range { background: #ef2929; }
+  #red .ui-slider-handle { border-color: #ef2929; }
+  #green .ui-slider-range { background: #8ae234; }
+  #green .ui-slider-handle { border-color: #8ae234; }
+  #blue .ui-slider-range { background: #729fcf; }
+  #blue .ui-slider-handle { border-color: #729fcf; }
+  
+</style>
+
+
+
+<script type="text/javascript">
+var socket;
+var msg_id = 0;
+
+function init() {
+
+  
+	var host = "ws://io.theapi.co.uk:8080"; // SET THIS TO YOUR SERVER
+	try {
+		socket = new WebSocket(host);
+		log('WebSocket - status '+socket.readyState);
+		socket.onopen    = function(msg) { 
+							   log("Welcome - status "+this.readyState); 
+						   };
+		socket.onmessage = function(msg) { 
+							   log("Received: "+msg.data); 
+						   };
+		socket.onclose   = function(msg) { 
+							   log("Disconnected - status "+this.readyState); 
+						   };
+	}
+	catch(ex){ 
+		log(ex); 
+	}
+	$("#msg").focus();
+}
+
+function send(){
+	var txt,msg;
+	txt = $("#msg");
+	msg = txt.value;
+	if(!msg) { 
+		alert("Message can not be empty"); 
+		return; 
+	}
+	txt.value="";
+	txt.focus();
+	try { 
+		socket.send(msg); 
+		log('Sent: '+msg); 
+	} catch(ex) { 
+		log(ex); 
+	}
+}
+function quit(){
+	if (socket != null) {
+		log("Goodbye!");
+		socket.close();
+		socket=null;
+	}
+}
+
+function reconnect() {
+	quit();
+	init();
+}
+
+function log(msg){ console.log(msg);
+ $("#log").html("<pre>" + msg + "</pre>" + $("#log").html()); 
+}
+
+
+function hexFromRGB(r, g, b) {
+  var hex = [
+    r.toString( 16 ),
+    g.toString( 16 ),
+    b.toString( 16 )
+  ];
+  $.each( hex, function( nr, val ) {
+    if ( val.length === 1 ) {
+      hex[ nr ] = "0" + val;
+    }
+  });
+  return hex.join( "" ).toUpperCase();
+}
+
+function refreshSwatch() {
+  var red = $( "#red" ).slider( "value" ),
+    green = $( "#green" ).slider( "value" ),
+    blue = $( "#blue" ).slider( "value" ),
+    hex = hexFromRGB( red, green, blue );
+  $( "#swatch" ).css( "background-color", "#" + hex );
+ 
+}
+
+function sliderChanged() {
+  refreshSwatch();
+  sendValues();
+}
+
+function sendValues(vals) {
+  var red = $( "#red" ).slider( "value" );
+  var green = $( "#green" ).slider( "value" );
+  var blue = $( "#blue" ).slider( "value" );
+
+  msg_id++;
+  
+  // eg; p,t,0,0,23,32767,32768,65534,65535
+  var msg = 'W,l,' + msg_id + ',' + red + ',' + green + ',' + blue + ',' + '0,0';
+  if (socket) {
+    try { 
+      socket.send(msg); 
+      log('Sent: '+msg); 
+    } catch(ex) { 
+      log(ex); 
+    }
+	}
+}
+
+$(function() {
+  $( "#red, #green, #blue" ).slider({
+    orientation: "horizontal",
+    range: "min",
+    max: 255,
+    value: 127,
+    slide: refreshSwatch,
+    change: sliderChanged
+  });
+  $( "#red" ).slider( "value", 255 );
+  $( "#green" ).slider( "value", 140 );
+  $( "#blue" ).slider( "value", 60 );
+});
+
+
+</script>
+
+</head>
+<body onload="init()" class="ui-widget-content" style="border:0;">
+
+<h3>NRF24 WebSocket Colour Picker</h3>
+
+ 
+<div id="red"></div>
+<div id="green"></div>
+<div id="blue"></div>
+ 
+<div id="swatch" class="ui-widget-content ui-corner-all"></div>
+
+
+<div id="log"></div>
+<input id="msg" type="textbox" onkeypress="onkey(event)"/>
+<button onclick="send()">Send</button>
+<button onclick="quit()">Quit</button>
+<button onclick="reconnect()">Reconnect</button>
+</body>
+</html>
