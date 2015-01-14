@@ -198,7 +198,20 @@ void processPayload()
     rx_payload.getC(),
     rx_payload.getD());
     
-  if (rx_payload.getA() > 0) {
+  char type = rx_payload.getType();
+  if (type == 'l') {
+    // RGB in A, B and C
+    byte r = rx_payload.getA();
+    byte g = rx_payload.getB();
+    byte b = rx_payload.getC();
+    uint32_t color = strip.Color(r, g, b);
+    
+    for (uint16_t i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, color);
+    }
+    
+    strip.show();
+  } else if (rx_payload.getA() > 0) {
     // Do something...
     handleCommand(rx_payload.getA());
   }
