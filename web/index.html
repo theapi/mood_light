@@ -59,20 +59,21 @@ var msg_id = 0;
 
 function init() {
 
-    var host = "ws://localhost:8080"; // SET THIS TO YOUR SERVER
+    var host = "ws://127.0.1.1:8080"; // SET THIS TO YOUR SERVER
 	//var host = "ws://io.theapi.co.uk:8080"; // SET THIS TO YOUR SERVER
 	try {
 		socket = new WebSocket(host);
 		log('WebSocket - status '+socket.readyState);
 		socket.onopen    = function(msg) { 
-							   log("Welcome - status "+this.readyState); 
-						   };
+			log("Welcome - status "+this.readyState); 
+		};
 		socket.onmessage = function(msg) { 
-							   log("Received: "+msg.data); 
-						   };
+		  log("Received: "+msg.data); 
+		  processMessageData(msg.data);
+		};
 		socket.onclose   = function(msg) { 
-							   log("Disconnected - status "+this.readyState); 
-						   };
+		 log("Disconnected - status "+this.readyState); 
+		};
 	}
 	catch(ex){ 
 		log(ex); 
@@ -110,7 +111,7 @@ function reconnect() {
 	init();
 }
 
-function log(msg){ console.log(msg);
+function log(msg){
  $("#log").html("<pre>" + msg + "</pre>" + $("#log").html()); 
 }
 
@@ -141,6 +142,21 @@ function refreshSwatch() {
 function sliderChanged() {
   refreshSwatch();
   sendValues();
+}
+
+function processMessageData(str) {
+  // eg; :,w,l,1,0,255,255,255,0
+  
+  // tmp
+  //str = ':,' + str;
+  
+  var res = str.split(',');
+
+  $( "#red" ).slider( "option", "value", res[5] );
+  $( "#green" ).slider( "value", res[6] );
+  $( "#blue" ).slider( "value", res[7] );
+  refreshSwatch();
+  
 }
 
 /**
@@ -180,7 +196,7 @@ $(function() {
     max: 255,
     value: 127,
     slide: refreshSwatch,
-    change: sliderChanged
+    stop: sliderChanged
   });
   $( "#red" ).slider( "value", 255 );
   $( "#green" ).slider( "value", 140 );
