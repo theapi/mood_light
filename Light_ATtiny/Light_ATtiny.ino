@@ -82,14 +82,27 @@ void loop(void)
   }
   
   // Check for a message from the controller
-  if (radio.available()) {
+  if (radio.available()) {                                                                                                                                                                                            
     // Get the payload
     radio.read( &rx, Nrf24Payload_SIZE);
     rx_payload.unserialize(rx);
 
-    // Only act on messages of type 'L'
-    if (rx_payload.getType() == 'L') {
-      // Do something...
+    if (rx_payload.getType() == 'l') {
+      // Setting a colour so no command now
+      current_cmd = 0;
+      // RGB values in A, B and C (from websocket etc)
+      byte r = rx_payload.getA();
+      byte g = rx_payload.getB();
+      byte b = rx_payload.getC();
+      uint32_t color = strip.Color(r, g, b);
+      
+      for (uint16_t i=0; i<strip.numPixels(); i++) {
+        strip.setPixelColor(i, color);
+      }
+      
+      strip.show();
+    } else if (rx_payload.getType() == 'L') {
+      // Direct light commands
       handleCommand(rx_payload.getA());
     }
   }
