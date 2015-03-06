@@ -11,8 +11,8 @@
  
  */
  
-#define ENC_RED_A 14
-#define ENC_RED_B 15
+#define ENC_A 14
+#define ENC_B 15
 #define ENC_PORT PINC
 #define PROCESSING 1
  
@@ -53,17 +53,17 @@ byte address_base[6] = BASE_ADDRESS;
 
 uint16_t msg_id = 0;
 
-volatile int red_counter = 0; // changed by encoder input
-volatile byte red_ab = 0; // The previous & current reading
+volatile int enc_counter = 0; // changed by encoder input
+volatile byte enc_ab = 0; // The previous & current reading
 
 void setup() 
 {
   
   // Setup encoder pins as inputs
-  pinMode(ENC_RED_A, INPUT);
-  digitalWrite(ENC_RED_A, HIGH);
-  pinMode(ENC_RED_B, INPUT);
-  digitalWrite(ENC_RED_B, HIGH);
+  pinMode(ENC_A, INPUT);
+  digitalWrite(ENC_A, HIGH);
+  pinMode(ENC_B, INPUT);
+  digitalWrite(ENC_B, HIGH);
   
   
   pinMode(PIN_LED_RED, OUTPUT);
@@ -110,33 +110,33 @@ void setup()
 void loop(void)
 {
 
-  static int last_red_count = 0;
-  static byte last_red_ab = 0;
+  static int last_enc_count = 0;
+  static byte last_enc_ab = 0;
   
-  if (last_red_ab != red_ab) {
-    last_red_ab = red_ab;
+  if (last_enc_ab != enc_ab) {
+    last_enc_ab = enc_ab;
     if (!PROCESSING) {
       Serial.print("Red: ");
-      Serial.print(( red_ab & 0x0f ), DEC);
+      Serial.print(( enc_ab & 0x0f ), DEC);
       Serial.print(" : ");
-      Serial.print(( red_ab & 0x0f ), BIN);
+      Serial.print(( enc_ab & 0x0f ), BIN);
       Serial.print(" : ");
-      Serial.println(red_counter, DEC);
+      Serial.println(enc_counter, DEC);
     }
   }
   
-  if (last_red_count != red_counter) {
-    last_red_count = red_counter;
+  if (last_enc_count != enc_counter) {
+    last_enc_count = enc_counter;
     
     // Set the local light to the new colour
     // let it overflow for now
-    byte r = red_counter;
+    byte r = enc_counter;
     byte g = 0;
     byte b = 0;
     setLedColour(r, g, b);
     
     if (PROCESSING) {
-      Serial.println(red_counter, DEC);
+      Serial.println(enc_counter, DEC);
     }
     
     
@@ -169,7 +169,7 @@ ISR(PCINT1_vect)
   char tmpdata;
   tmpdata = read_encoder();
   if (tmpdata) {
-    red_counter += tmpdata;
+    enc_counter += tmpdata;
   }
 }
 
@@ -236,18 +236,18 @@ int8_t read_encoder()
   // ab gets shifted left two times 
   // saving previous reading and setting two lower bits to “0″ 
   // so the current reading can be correctly ORed.
-  red_ab <<= 2;
+  enc_ab <<= 2;
   
   // ENC_PORT & 0×03 reads the port to which encoder is connected 
   // and sets all but two lower bits to zero 
   // so when you OR it with ab bits 2-7 would stay intact. 
   // Then it gets ORed with ab. 
-  red_ab |= ( ENC_PORT & 0x03 );  //add current state
+  enc_ab |= ( ENC_PORT & 0x03 );  //add current state
   // At this point, we have previous reading of encoder pins in bits 2,3 of ab, 
   // current readings in bits 0,1, and together they form index of (AKA pointer to) enc_states[]  
   // array element containing current state.
   // The index being the the lowest nibble of ab (ab & 0x0f)
-  return ( enc_states[( red_ab & 0x0f )]);
+  return ( enc_states[( enc_ab & 0x0f )]);
 }
 
  
