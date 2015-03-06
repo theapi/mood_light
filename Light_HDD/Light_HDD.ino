@@ -57,7 +57,7 @@ int8_t mode = 0;
 // 1 = Saturation
 // 2 = Intensity
 
-float hue = 126.0;
+float hue = 0.0;
 float saturation = 1.0;
 float intensity = 1.0;
 
@@ -130,6 +130,8 @@ void loop(void)
     tx_payload.setType('l'); // light command
     tx_payload.setId(msg_id++);
     tx_payload.setA(rgb[0]);
+    tx_payload.setB(rgb[1]);
+    tx_payload.setC(rgb[2]);
     uint8_t tx_buffer[Nrf24Payload_SIZE];
     tx_payload.serialize(tx_buffer);
     if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
@@ -166,25 +168,25 @@ void changeMode()
 void setColour(int val, int* rgb)
 {
   int tmp = 0;
-  tmp = 360 - abs(val);
-  // todo map to 0 - 360
+  tmp = abs(val);
+  
+
 
   switch (mode) {
     case 0: // Hue (0-360 degrees)
       hsi2rgb((float) tmp, saturation, intensity, rgb);
       break;
-    case 1: // Saturation
+    case 1: // Saturation (0 - 1)
       // ...
       break;
-    case 2: // Intensity
+    case 2: // Intensity (0 - 1)
       // ...
       break;
   }
 
-
-  analogWrite(PIN_LED_RED, rgb[0]);
-  analogWrite(PIN_LED_GREEN, rgb[1]);
-  analogWrite(PIN_LED_BLUE, rgb[2]);
+  analogWrite(PIN_LED_RED, map(rgb[0], 0, 255, 255, 0));
+  analogWrite(PIN_LED_GREEN, map(rgb[1], 0, 255, 255, 0));
+  analogWrite(PIN_LED_BLUE, map(rgb[2], 0, 255, 255, 0));
 }
 
 
