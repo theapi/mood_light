@@ -1,23 +1,22 @@
-
 /**
 
  Use hard drive rotary encoders to send RGB values to the NRF24 network.
- 
+
 
  As the arduino ide can only have one serial monitor open, use minicom if needed:
   minicom --baudrate 57600 --device /dev/ttyUSB0
-  
+
  Using the RF24 library from https://github.com/TMRh20/RF24
- 
- */
- 
-#define ENC_A 14
-#define ENC_B 15
+
+*/
+
+#define ENC_A 14 // A0 (PC0 - PCINT8)
+#define ENC_B 15 // A1 (PC1 - PCINT9)
 #define ENC_PORT PINC
 #define PROCESSING 1
- 
+
 #define DEVICE_ID 'B'
- 
+
 //#define RX_ADDRESS "AAAAA"
 #define RX_ADDRESS "BBBBB"
 //#define RX_ADDRESS "CCCCC"
@@ -30,7 +29,6 @@
 #include <SPI.h>
 #include "nRF24L01.h"
 #include "RF24.h"
-#include "printf.h"
 
 #include <Nrf24Payload.h>
 
@@ -39,7 +37,7 @@
 #define PIN_LED_RED 3
 #define PIN_LED_GREEN 5
 #define PIN_LED_BLUE 6
-
+#define PIN_MOMENTARY_SWITCH 4
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -50,119 +48,147 @@ uint8_t rx[Nrf24Payload_SIZE];
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
-
 uint16_t msg_id = 0;
+
+// HSI colour space
+// @see http://blog.saikoled.com/post/43693602826/why-every-led-light-should-be-using-hsi
+int8_t mode = 0;
+// 0 = Hue
+// 1 = Saturation
+// 2 = Intensity
+
+float hue = 126.0;
+float saturation = 1.0;
+float intensity = 1.0;
 
 volatile int enc_counter = 0; // changed by encoder input
 volatile byte enc_ab = 0; // The previous & current reading
 
-void setup() 
+void setup()
 {
-  
-  // Setup encoder pins as inputs
-  pinMode(ENC_A, INPUT);
-  digitalWrite(ENC_A, HIGH);
-  pinMode(ENC_B, INPUT);
-  digitalWrite(ENC_B, HIGH);
-  
-  
+
+  // Setup encoder pins as inputs with pull up resistor
+  pinMode(ENC_A, INPUT_PULLUP);
+  pinMode(ENC_B, INPUT_PULLUP);
+
+  // RGB indicator led pins as output
   pinMode(PIN_LED_RED, OUTPUT);
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_BLUE, OUTPUT);
-  
-  // common anode
+
+  // common anode, ensure leds are off
   digitalWrite(PIN_LED_RED, HIGH);
   digitalWrite(PIN_LED_GREEN, HIGH);
   digitalWrite(PIN_LED_BLUE, HIGH);
 
-  
-  setupPinInterrupt();
-  
-  Serial.begin(57600);
-  printf_begin();
-  printf("\n\r Light_HDD on address: %s \n\r", RX_ADDRESS);
+  // Momentary switch to change modes as input with pull up resistor
+  pinMode(PIN_MOMENTARY_SWITCH, INPUT_PULLUP);
 
+  // Listen to the encoder with interrupts
+  setupPinInterrupt();
+
+  if (PROCESSING) {
+    Serial.begin(57600);
+  }
 
   // Setup and configure rf radio
   radio.begin(); // Start up the radio
-  radio.setPayloadSize(Nrf24Payload_SIZE);               
+  radio.setPayloadSize(Nrf24Payload_SIZE);
   radio.setAutoAck(1); // Ensure autoACK is enabled
   radio.setRetries(0,15); // Max delay between retries & number of retries
 
-  
+
   // Pipe for talking to the base
   radio.openWritingPipe(address_base);
-  
+
   // Pipe for listening to the base
   //radio.openReadingPipe(1, address);
-  
-  // Start listening
-  //radio.startListening(); 
-  // Dump the configuration of the rf unit for debugging
-  radio.printDetails();  
-  
-  Serial.print("Size of payload = ");
-  Serial.println(radio.getPayloadSize());
 
-  
 }
 
 void loop(void)
 {
+  int rgb[3] = {0, 0, 0};
 
+  static unsigned long mode_last = 0;
   static int last_enc_count = 0;
-  static byte last_enc_ab = 0;
-  
-  if (last_enc_ab != enc_ab) {
-    last_enc_ab = enc_ab;
-    if (!PROCESSING) {
-      Serial.print("Red: ");
-      Serial.print(( enc_ab & 0x0f ), DEC);
-      Serial.print(" : ");
-      Serial.print(( enc_ab & 0x0f ), BIN);
-      Serial.print(" : ");
-      Serial.println(enc_counter, DEC);
-    }
-  }
-  
+
   if (last_enc_count != enc_counter) {
     last_enc_count = enc_counter;
-    
+
     // Set the local light to the new colour
-    // let it overflow for now
-    byte r = enc_counter;
-    byte g = 0;
-    byte b = 0;
-    setLedColour(r, g, b);
-    
+    int val = enc_counter;
+    setColour(val, rgb);
+
     if (PROCESSING) {
       Serial.println(enc_counter, DEC);
     }
-    
-    
+
     // Prepare the message.
-    Nrf24Payload tx_payload = Nrf24Payload();      
+    Nrf24Payload tx_payload = Nrf24Payload();
     tx_payload.setDeviceId(DEVICE_ID);
     tx_payload.setType('l'); // light command
     tx_payload.setId(msg_id++);
-    tx_payload.setA(r);
+    tx_payload.setA(rgb[0]);
     uint8_t tx_buffer[Nrf24Payload_SIZE];
     tx_payload.serialize(tx_buffer);
-    if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) { 
-      //printf(" no ack.\n\r"); 
+    if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
+      // no ack
     }
-    
+
   }
-  
+
+
+  // Check mode switch
+  unsigned long now = millis();
+  // One push on switch per half second
+  if (now - mode_last > 500) {
+    if (digitalRead(PIN_MOMENTARY_SWITCH)) {
+      mode_last = now;
+      // Change mode
+      changeMode();
+    }
+  }
+
 }
 
-void setLedColour(byte r, byte g, byte b)
+void changeMode()
 {
-  r = 255 - abs(r);
-  analogWrite(PIN_LED_RED, r);
+  // Shift up to the next mode
+  mode <<= 1;
+  if (mode > 0x10) {
+    // wrap round
+    mode = 0x00;
+  }
+
 }
 
-// Pin interrupt on port C == A0 -> A5 
+void setColour(int val, int* rgb)
+{
+  int tmp = 0;
+  tmp = 360 - abs(val);
+  // todo map to 0 - 360
+
+  switch (mode) {
+    case 0: // Hue (0-360 degrees)
+      hsi2rgb((float) tmp, saturation, intensity, rgb);
+      break;
+    case 1: // Saturation
+      // ...
+      break;
+    case 2: // Intensity
+      // ...
+      break;
+  }
+
+
+  analogWrite(PIN_LED_RED, rgb[0]);
+  analogWrite(PIN_LED_GREEN, rgb[1]);
+  analogWrite(PIN_LED_BLUE, rgb[2]);
+}
+
+
+// Pin interrupt on port C == A0 -> A5
 // Any change on any enabled PCINT[14:8] pin will cause an interrupt.
 ISR(PCINT1_vect)
 {
@@ -178,30 +204,31 @@ void setupPinInterrupt()
   // 13.2.4 PCICR – Pin Change Interrupt Control Register
   // Bit 1 – PCIE1: Pin Change Interrupt Enable 1
   PCICR = (1 << PCIE1); // 0x02  00000010
-  
+
   // 13.2.7 PCMSK1 – Pin Change Mask Register 1
-  PCMSK1 =  ((1 << PCINT9) | (1 << PCINT8)); // listen for interrupts on A1 and A0 
+  // listen for interrupts on A1 & A0
+  PCMSK1 =  ((1 << PCINT9) | (1 << PCINT8));
 }
 
 /**
- * returns change in encoder state (-1,0,1) 
+ * returns change in encoder state (-1,0,1)
  */
 int8_t read_encoder()
 {
-  // enc_states[] array is a look-up table; 
-  // it is pre-filled with encoder states, 
-  // with “-1″ or “1″ being valid states and “0″ being invalid. 
-  // We know that there can be only two valid combination of previous and current readings of the encoder 
-  // – one for the step in a clockwise direction, 
-  // another one for counterclockwise. 
-  // Anything else, whether it's encoder that didn't move between reads 
+  // enc_states[] array is a look-up table;
+  // it is pre-filled with encoder states,
+  // with “-1″ or “1″ being valid states and “0″ being invalid.
+  // We know that there can be only two valid combination of previous and current readings of the encoder
+  // – one for the step in a clockwise direction,
+  // another one for counterclockwise.
+  // Anything else, whether it's encoder that didn't move between reads
   // or an incorrect combination due to bouncing, is reported as zero.
   static int8_t enc_states[] = {
     0,-1,1,0, 1,0,0,-1, -1,0,0,1, 0,1,-1,0
   };
-  
+
   /*
-   The lookup table of the binary values represented by enc_states 
+   The lookup table of the binary values represented by enc_states
      ___     ___     __
    A    |   |   |   |
         |___|   |___|
@@ -210,13 +237,13 @@ int8_t read_encoder()
      _____     ___     __
    B      |   |   |   |
           |___|   |___|
-   
+
    A is represented by bit 0 and bit 2
    B is represented by bit 1 and bit 3
    With previous and current values stored in 4 bit data there can be
    16 possible combinations.
    The enc_states lookup table represents each one and what it means:
-   
+
    [0] = 0000; A & B both low as before: no change : 0
    [1] = 0001; A just became high while B is low: reverse : -1
    [2] = 0010; B just became high while A is low: forward : +1
@@ -227,27 +254,67 @@ int8_t read_encoder()
    [7] = 0111; A just became high while B was already high: reverse : -1
    [8] = 1000; B just became low while A was already low: reverse : -1
    etc...
-   
+
    Forward: 1101 (13) - 0100 (4) - 0010 (2) - 1011 (11)
    Reverse: 1110 (14) - 1000 (8) - 0001 (1) - 0111 (7)
-   
+
   */
 
-  // ab gets shifted left two times 
-  // saving previous reading and setting two lower bits to “0″ 
+  // ab gets shifted left two times
+  // saving previous reading and setting two lower bits to “0″
   // so the current reading can be correctly ORed.
   enc_ab <<= 2;
-  
-  // ENC_PORT & 0×03 reads the port to which encoder is connected 
-  // and sets all but two lower bits to zero 
-  // so when you OR it with ab bits 2-7 would stay intact. 
-  // Then it gets ORed with ab. 
+
+  // ENC_PORT & 0×03 reads the port to which encoder is connected
+  // and sets all but two lower bits to zero
+  // so when you OR it with ab bits 2-7 would stay intact.
+  // Then it gets ORed with ab.
   enc_ab |= ( ENC_PORT & 0x03 );  //add current state
-  // At this point, we have previous reading of encoder pins in bits 2,3 of ab, 
-  // current readings in bits 0,1, and together they form index of (AKA pointer to) enc_states[]  
+  // At this point, we have previous reading of encoder pins in bits 2,3 of ab,
+  // current readings in bits 0,1, and together they form index of (AKA pointer to) enc_states[]
   // array element containing current state.
   // The index being the the lowest nibble of ab (ab & 0x0f)
   return ( enc_states[( enc_ab & 0x0f )]);
 }
 
- 
+/**
+ *
+ * Function example takes H, S, I, and a pointer to the
+ * returned RGB colorspace converted vector. It should
+ * be initialized with:
+ *
+ * int rgb[3];
+ *
+ * in the calling function. After calling hsi2rgb
+ * the vector rgb will contain red, green, and blue
+ * calculated values.
+ *
+ * @see http://blog.saikoled.com/post/43693602826/why-every-led-light-should-be-using-hsi
+ */
+void hsi2rgb(float H, float S, float I, int* rgb) {
+  int r, g, b;
+  H = fmod(H,360); // cycle H around to 0-360 degrees
+  H = 3.14159*H/(float)180; // Convert to radians.
+  S = S>0?(S<1?S:1):0; // clamp S and I to interval [0,1]
+  I = I>0?(I<1?I:1):0;
+
+  // Math! Thanks in part to Kyle Miller.
+  if(H < 2.09439) {
+    r = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    g = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    b = 255*I/3*(1-S);
+  } else if(H < 4.188787) {
+    H = H - 2.09439;
+    g = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    b = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    r = 255*I/3*(1-S);
+  } else {
+    H = H - 4.188787;
+    b = 255*I/3*(1+S*cos(H)/cos(1.047196667-H));
+    r = 255*I/3*(1+S*(1-cos(H)/cos(1.047196667-H)));
+    g = 255*I/3*(1-S);
+  }
+  rgb[0]=r;
+  rgb[1]=g;
+  rgb[2]=b;
+}
