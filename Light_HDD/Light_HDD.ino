@@ -37,7 +37,9 @@
 #define PIN_LED_RED 3
 #define PIN_LED_GREEN 5
 #define PIN_LED_BLUE 6
-#define PIN_MOMENTARY_SWITCH 4
+#define PIN_SWITCH_A 16 // A2 (PC2 - PCINT10)
+#define PIN_SWITCH_B 17 // A3 (PC3 - PCINT11)
+#define PIN_SWITCH_C 18 // A4 (PC4 - PCINT12)
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -81,8 +83,10 @@ void setup()
   digitalWrite(PIN_LED_GREEN, HIGH);
   digitalWrite(PIN_LED_BLUE, HIGH);
 
-  // Momentary switch to change modes as input with pull up resistor
-  pinMode(PIN_MOMENTARY_SWITCH, INPUT_PULLUP);
+  // Switches to change modes as input
+  pinMode(PIN_SWITCH_A, INPUT);
+  pinMode(PIN_SWITCH_B, INPUT);
+  pinMode(PIN_SWITCH_C, INPUT);
 
   // Listen to the encoder with interrupts
   setupPinInterrupt();
@@ -116,7 +120,7 @@ void loop(void)
   if (last_enc_count != enc_counter) {
     last_enc_count = enc_counter;
 
-    // Set the local light to the new colour
+    // Set the new colour
     int val = enc_counter;
     setColour(val, rgb);
 
@@ -140,50 +144,50 @@ void loop(void)
 
   }
 
-
   // Check mode switch
   unsigned long now = millis();
-  // One push on switch per half second
-  if (now - mode_last > 500) {
-    if (digitalRead(PIN_MOMENTARY_SWITCH)) {
+  // Debounce, then set the mode.
+  if (now - mode_last > 50) {
+    if (digitalRead(PIN_SWITCH_A)) {
       mode_last = now;
-      // Change mode
-      changeMode();
+      mode = 0;
+    } else if (digitalRead(PIN_SWITCH_B)) {
+      mode_last = now;
+      mode = 1;
+    } else if (digitalRead(PIN_SWITCH_C)) {
+      mode_last = now;
+      mode = 2;
     }
-  }
-
-}
-
-void changeMode()
-{
-  // Shift up to the next mode
-  mode <<= 1;
-  if (mode > 0x10) {
-    // wrap round
-    mode = 0x00;
   }
 
 }
 
 void setColour(int val, int* rgb)
 {
-  int tmp = 0;
-  tmp = abs(val);
-  
-
+  float tmp = (float) abs(val);
+  float mapped = 1.0;
 
   switch (mode) {
     case 0: // Hue (0-360 degrees)
       hsi2rgb((float) tmp, saturation, intensity, rgb);
+      // Store in the global for use in the other modes.
+      hue = tmp;
       break;
     case 1: // Saturation (0 - 1)
-      // ...
+      // convert count to fit in range 0 - 1
+
+      // float version of map()
+      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0) + 1.0;
+      hsi2rgb(hue, mapped, intensity, rgb);
+      // Store in the global for use in the other modes.
+      saturation = tmp;
       break;
     case 2: // Intensity (0 - 1)
       // ...
       break;
   }
 
+  // Show the colour on the local led (common anode)
   analogWrite(PIN_LED_RED, map(rgb[0], 0, 255, 255, 0));
   analogWrite(PIN_LED_GREEN, map(rgb[1], 0, 255, 255, 0));
   analogWrite(PIN_LED_BLUE, map(rgb[2], 0, 255, 255, 0));
