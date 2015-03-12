@@ -174,16 +174,18 @@ void setColour(int val, int* rgb)
       hue = tmp;
       break;
     case 1: // Saturation (0 - 1)
-      // convert count to fit in range 0 - 1
-
-      // float version of map()
-      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0) + 1.0;
+      // float version of map(val, 0, 360, 0, 1)
+      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, mapped, intensity, rgb);
       // Store in the global for use in the other modes.
       saturation = tmp;
       break;
     case 2: // Intensity (0 - 1)
-      // ...
+      // float version of map(val, 0, 360, 0, 1)
+      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
+      hsi2rgb(hue, saturation, mapped, rgb);
+      // Store in the global for use in the other modes.
+      intensity = tmp;
       break;
   }
 
