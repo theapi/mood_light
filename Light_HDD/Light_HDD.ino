@@ -10,10 +10,16 @@
 
 */
 
+// Whether serial out put should be created & sent to Processing
+#define PROCESSING 1
+
+// Whether tthe NRF24 radio is attached
+#define RADIO 0
+
 #define ENC_A 14 // A0 (PC0 - PCINT8)
 #define ENC_B 15 // A1 (PC1 - PCINT9)
 #define ENC_PORT PINC
-#define PROCESSING 1
+
 
 #define DEVICE_ID 'B'
 
@@ -93,20 +99,19 @@ void setup()
 
   if (PROCESSING) {
     Serial.begin(57600);
+    Serial.println("Setup");
   }
 
-  // Setup and configure rf radio
-  radio.begin(); // Start up the radio
-  radio.setPayloadSize(Nrf24Payload_SIZE);
-  radio.setAutoAck(1); // Ensure autoACK is enabled
-  radio.setRetries(0,15); // Max delay between retries & number of retries
+  if (RADIO) {
+    // Setup and configure rf radio
+    radio.begin(); // Start up the radio
+    radio.setPayloadSize(Nrf24Payload_SIZE);
+    radio.setAutoAck(1); // Ensure autoACK is enabled
+    radio.setRetries(0,15); // Max delay between retries & number of retries
 
-
-  // Pipe for talking to the base
-  radio.openWritingPipe(address_base);
-
-  // Pipe for listening to the base
-  //radio.openReadingPipe(1, address);
+    // Pipe for talking to the base
+    radio.openWritingPipe(address_base);
+  }
 
 }
 
@@ -128,18 +133,20 @@ void loop(void)
       Serial.println(enc_counter, DEC);
     }
 
-    // Prepare the message.
-    Nrf24Payload tx_payload = Nrf24Payload();
-    tx_payload.setDeviceId(DEVICE_ID);
-    tx_payload.setType('l'); // light command
-    tx_payload.setId(msg_id++);
-    tx_payload.setA(rgb[0]);
-    tx_payload.setB(rgb[1]);
-    tx_payload.setC(rgb[2]);
-    uint8_t tx_buffer[Nrf24Payload_SIZE];
-    tx_payload.serialize(tx_buffer);
-    if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
-      // no ack
+    if (RADIO) {
+      // Prepare the message.
+      Nrf24Payload tx_payload = Nrf24Payload();
+      tx_payload.setDeviceId(DEVICE_ID);
+      tx_payload.setType('l'); // light command
+      tx_payload.setId(msg_id++);
+      tx_payload.setA(rgb[0]);
+      tx_payload.setB(rgb[1]);
+      tx_payload.setC(rgb[2]);
+      uint8_t tx_buffer[Nrf24Payload_SIZE];
+      tx_payload.serialize(tx_buffer);
+      if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
+        // no ack
+      }
     }
 
   }
