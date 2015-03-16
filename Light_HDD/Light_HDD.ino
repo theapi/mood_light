@@ -67,6 +67,7 @@ int8_t mode = 0;
 // 0 = Hue
 // 1 = Saturation
 // 2 = Intensity
+// 3 = Warning battery low!
 
 unsigned long battery_last_check = 0;
 int8_t battery_reading = 0;
@@ -138,27 +139,38 @@ void loop(void)
   if (last_enc_count != enc_counter) {
     last_enc_count = enc_counter;
 
-    // Set the new colour
-    int val = enc_counter;
-    setColour(val, rgb);
+    if (mode == 3) {
+      // Low battery do nothing useful except blink
+      // Blink red on alternate encoder readings.
+      if (enc_counter % 2) {
+        showColour(255, 0, 0);
+      } else {
+        showColour(255, 0, 0);
+      }
+    } else {
+      // Set the new colour
+      int val = enc_counter;
+      setColour(val, rgb);
+      showColour(rgb[0], rgb[1], rgb[2]);
 
-    if (PROCESSING) {
-      Serial.println(enc_counter, DEC);
-    }
+      if (PROCESSING) {
+        Serial.println(enc_counter, DEC);
+      }
 
-    if (RADIO) {
-      // Prepare the message.
-      Nrf24Payload tx_payload = Nrf24Payload();
-      tx_payload.setDeviceId(DEVICE_ID);
-      tx_payload.setType('l'); // light command
-      tx_payload.setId(msg_id++);
-      tx_payload.setA(rgb[0]);
-      tx_payload.setB(rgb[1]);
-      tx_payload.setC(rgb[2]);
-      uint8_t tx_buffer[Nrf24Payload_SIZE];
-      tx_payload.serialize(tx_buffer);
-      if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
-        // no ack
+      if (RADIO) {
+        // Prepare the message.
+        Nrf24Payload tx_payload = Nrf24Payload();
+        tx_payload.setDeviceId(DEVICE_ID);
+        tx_payload.setType('l'); // light command
+        tx_payload.setId(msg_id++);
+        tx_payload.setA(rgb[0]);
+        tx_payload.setB(rgb[1]);
+        tx_payload.setC(rgb[2]);
+        uint8_t tx_buffer[Nrf24Payload_SIZE];
+        tx_payload.serialize(tx_buffer);
+        if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
+          // no ack
+        }
       }
     }
 
@@ -167,16 +179,18 @@ void loop(void)
   // Check mode switch
   unsigned long now = millis();
   // Debounce, then set the mode.
-  if (now - mode_last > 50) {
-    if (digitalRead(PIN_SWITCH_A)) {
-      mode_last = now;
-      mode = 0;
-    } else if (digitalRead(PIN_SWITCH_B)) {
-      mode_last = now;
-      mode = 1;
-    } else if (digitalRead(PIN_SWITCH_C)) {
-      mode_last = now;
-      mode = 2;
+  if (mode != 3) { // Ignore switches if low battery warning
+    if (now - mode_last > 50) {
+      if (digitalRead(PIN_SWITCH_A)) {
+        mode_last = now;
+        mode = 0;
+      } else if (digitalRead(PIN_SWITCH_B)) {
+        mode_last = now;
+        mode = 1;
+      } else if (digitalRead(PIN_SWITCH_C)) {
+        mode_last = now;
+        mode = 2;
+      }
     }
   }
 
@@ -190,8 +204,11 @@ void loop(void)
       battery_reading = 0;
       long vcc = batteryRead();
       if (vcc < 3200) {
-        // Save the battery from over disharge, turn off now
+        // Save the battery from over discharge, turn off now
         digitalWrite(PIN_POWER, HIGH);
+      } else if (vcc < 3300) {
+        // Warning
+        mode = 3;
       }
     }
   }
@@ -224,13 +241,16 @@ void setColour(int val, int* rgb)
       intensity = tmp;
       break;
   }
-
-  // Show the colour on the local led (common anode)
-  analogWrite(PIN_LED_RED, map(rgb[0], 0, 255, 255, 0));
-  analogWrite(PIN_LED_GREEN, map(rgb[1], 0, 255, 255, 0));
-  analogWrite(PIN_LED_BLUE, map(rgb[2], 0, 255, 255, 0));
 }
 
+/**
+ * Show the colour on the local led (common anode)
+ */
+void showColour(byte r, byte g, byte b) {
+  analogWrite(PIN_LED_RED, map(r, 0, 255, 255, 0));
+  analogWrite(PIN_LED_GREEN, map(g, 0, 255, 255, 0));
+  analogWrite(PIN_LED_BLUE, map(b, 0, 255, 255, 0));
+}
 
 // Pin interrupt on port C == A0 -> A5
 // Any change on any enabled PCINT[14:8] pin will cause an interrupt.
