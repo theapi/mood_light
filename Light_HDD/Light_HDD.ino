@@ -71,7 +71,7 @@ int8_t mode = 0;
 
 unsigned long battery_last_check = 0;
 int8_t battery_reading = 0;
-
+long vcc = 0;
 float hue = 0.0;
 float saturation = 1.0;
 float intensity = 1.0;
@@ -166,6 +166,7 @@ void loop(void)
         tx_payload.setA(rgb[0]);
         tx_payload.setB(rgb[1]);
         tx_payload.setC(rgb[2]);
+        tx_payload.setVcc(vcc);
         uint8_t tx_buffer[Nrf24Payload_SIZE];
         tx_payload.serialize(tx_buffer);
         if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
@@ -202,7 +203,7 @@ void loop(void)
   } else if (battery_reading == 1) {
     if (batteryReadComplete()) {
       battery_reading = 0;
-      long vcc = batteryRead();
+      vcc = batteryRead();
       if (vcc < 3200) {
         // Save the battery from over discharge, turn off now
         digitalWrite(PIN_POWER, HIGH);
