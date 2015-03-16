@@ -46,6 +46,9 @@
 #define PIN_SWITCH_A 16 // A2 (PC2 - PCINT10)
 #define PIN_SWITCH_B 17 // A3 (PC3 - PCINT11)
 #define PIN_SWITCH_C 18 // A4 (PC4 - PCINT12)
+#define PIN_POWER 4 // Must be low for power to flow (PNP)
+
+#define BATTERY_CHECK_TIME 60000 // How often to check the battery level
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -65,6 +68,9 @@ int8_t mode = 0;
 // 1 = Saturation
 // 2 = Intensity
 
+unsigned long battery_last_check = 0;
+int8_t battery_reading = 0;
+
 float hue = 0.0;
 float saturation = 1.0;
 float intensity = 1.0;
@@ -74,6 +80,10 @@ volatile byte enc_ab = 0; // The previous & current reading
 
 void setup()
 {
+  // Pull the PNP base low to keep the power on
+  // This must happen before the capacitor is full and starts blocking
+  pinMode(PIN_POWER, OUTPUT);
+  digitalWrite(PIN_POWER, LOW);
 
   // Setup encoder pins as inputs with pull up resistor
   pinMode(ENC_A, INPUT_PULLUP);
@@ -96,6 +106,9 @@ void setup()
 
   // Listen to the encoder with interrupts
   setupPinInterrupt();
+
+  // Turn on ADC to monitor the battery level
+  batteryAdcOn();
 
   if (PROCESSING) {
     Serial.begin(57600);
@@ -164,6 +177,22 @@ void loop(void)
     } else if (digitalRead(PIN_SWITCH_C)) {
       mode_last = now;
       mode = 2;
+    }
+  }
+
+  // Check the battery level (non blocking)
+  if (now - battery_last_check > BATTERY_CHECK_TIME) {
+    battery_last_check = now;
+    battery_reading = 1;
+    batteryStartReading();
+  } else if (battery_reading == 1) {
+    if (batteryReadComplete()) {
+      battery_reading = 0;
+      long vcc = batteryRead();
+      if (vcc < 3200) {
+        // Save the battery from over disharge, turn off now
+        digitalWrite(PIN_POWER, HIGH);
+      }
     }
   }
 
@@ -333,3 +362,82 @@ void hsi2rgb(float H, float S, float I, int* rgb) {
   rgb[1]=g;
   rgb[2]=b;
 }
+
+/**
+ * Battery power management funtions
+ */
+
+/**
+ * Checks to see if the ADC is on.
+ */
+byte batteryAdcIsOn()
+{
+  return bit_is_set(ADCSRA, ADEN);
+}
+
+/**
+ * Get the ADC ready.
+ * needs to "warm up" (datasheet: 23.5.2) as we are using the bandgap reference.
+ * "The first ADC conversion result after switching reference voltage source may be inaccurate"
+ */
+void batteryAdcOn()
+{
+  // Read 1.1V reference against AVcc
+  // set the reference to Vcc and the measurement to the internal 1.1V reference
+  ADMUX = (1 << REFS0) | (1 << MUX3) | (1 << MUX2) | (1 << MUX1);
+
+  // Power up the ADC, default values: no interrupts
+  ADCSRA = (1 << ADEN);
+}
+
+
+/**
+ * Start a non blocking read of the internal voltage ref.
+ */
+void batteryStartReading()
+{
+  // Start conversion
+  ADCSRA |= (1 << ADSC);
+}
+
+/**
+ * ADSC will read as one as long as a conversion is in progress. (Datasheet: 23.9.2)
+ */
+byte batteryIsReading()
+{
+  return bit_is_set(ADCSRA, ADSC);
+}
+
+/**
+ * One when a conversion has completed.
+ */
+byte batteryReadComplete()
+{
+  // This bit is set when an ADC conversion completes and the Data Registers are updated
+  // (datasheet: 23.9.2)
+  return bit_is_set(ADCSRA, ADIF);
+}
+
+/**
+ * Read the result, if available.
+ * Returns 0 if still measuring.
+ */
+long batteryRead()
+{
+  uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
+  uint8_t high = ADCH; // unlocks both
+  long result = (high<<8) | low;
+
+  result = 1125300L / result; // Calculate Vcc (in mV); 1125300 = 1.1*1023*1000
+
+  // Clear the conversion complete flag.
+  // "ADIF is cleared by writing a logical one to the flag" (datasheet: 23.9.2)
+  ADCSRA |= (1 << ADIF); // write 1 to flag to clear it
+
+  return result; // Vcc in millivolts
+}
+
+void batteryEnsureAdcOff() {
+  ADCSRA = 0;
+}
+
