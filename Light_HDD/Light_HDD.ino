@@ -48,7 +48,12 @@
 #define PIN_SWITCH_C 18 // A4 (PC4 - PCINT12)
 #define PIN_POWER 4 // Must be low for power to flow (PNP)
 
-#define BATTERY_CHECK_TIME 60000 // How often to check the battery level
+#define BATTERY_CHECK_TIME 30000 // How often to check the battery level
+
+#define MODE_HUE 0
+#define MODE_SATURATION 1
+#define MODE_INTENSITY 2
+#define MODE_LOW_BATTERY 3
 
 RF24 radio(PIN_CE, PIN_CSN);
 
@@ -134,44 +139,37 @@ void loop(void)
   int rgb[3] = {0, 0, 0};
 
   static unsigned long mode_last = 0;
+  static unsigned long battery_warning_last = 0;
   static int last_enc_count = 0;
 
-  if (last_enc_count != enc_counter) {
+
+
+  if (mode != MODE_LOW_BATTERY && last_enc_count != enc_counter) {
     last_enc_count = enc_counter;
 
-    if (mode == 3) {
-      // Low battery do nothing useful except blink
-      // Blink red on alternate encoder readings.
-      if (enc_counter % 2) {
-        showColour(255, 0, 0);
-      } else {
-        showColour(255, 0, 0);
-      }
-    } else {
-      // Set the new colour
-      int val = enc_counter;
-      setColour(val, rgb);
-      showColour(rgb[0], rgb[1], rgb[2]);
+    // Set the new colour
+    int val = enc_counter;
+    setColour(val, rgb);
+    showColour(rgb[0], rgb[1], rgb[2]);
 
-      if (PROCESSING) {
-        Serial.println(enc_counter, DEC);
-      }
+    if (PROCESSING) {
+      Serial.println(enc_counter, DEC);
+    }
 
-      if (RADIO) {
-        // Prepare the message.
-        Nrf24Payload tx_payload = Nrf24Payload();
-        tx_payload.setDeviceId(DEVICE_ID);
-        tx_payload.setType('l'); // light command
-        tx_payload.setId(msg_id++);
-        tx_payload.setA(rgb[0]);
-        tx_payload.setB(rgb[1]);
-        tx_payload.setC(rgb[2]);
-        tx_payload.setVcc(vcc);
-        uint8_t tx_buffer[Nrf24Payload_SIZE];
-        tx_payload.serialize(tx_buffer);
-        if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
-          // no ack
-        }
+    if (RADIO) {
+      // Prepare the message.
+      Nrf24Payload tx_payload = Nrf24Payload();
+      tx_payload.setDeviceId(DEVICE_ID);
+      tx_payload.setType('l'); // light command
+      tx_payload.setId(msg_id++);
+      tx_payload.setA(rgb[0]);
+      tx_payload.setB(rgb[1]);
+      tx_payload.setC(rgb[2]);
+      tx_payload.setVcc(vcc);
+      uint8_t tx_buffer[Nrf24Payload_SIZE];
+      tx_payload.serialize(tx_buffer);
+      if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
+        // no ack
       }
     }
 
@@ -179,20 +177,31 @@ void loop(void)
 
   // Check mode switch
   unsigned long now = millis();
-  // Debounce, then set the mode.
-  if (mode != 3) { // Ignore switches if low battery warning
+
+  if (mode == MODE_LOW_BATTERY) {
+
+    if (now - battery_warning_last > 250) {
+      batter_warning_last = now;
+      // blink
+      digitalWrite(PIN_LED_RED, !digitalRead(PIN_LED_RED));
+    }
+
+  } else {
+
+    // Debounce, then set the mode.
     if (now - mode_last > 50) {
       if (digitalRead(PIN_SWITCH_A)) {
         mode_last = now;
-        mode = 0;
+        mode = MODE_HUE;
       } else if (digitalRead(PIN_SWITCH_B)) {
         mode_last = now;
-        mode = 1;
+        mode = MODE_SATURATION;
       } else if (digitalRead(PIN_SWITCH_C)) {
         mode_last = now;
-        mode = 2;
+        mode = MODE_INTENSITY;
       }
     }
+
   }
 
   // Check the battery level (non blocking)
@@ -209,7 +218,10 @@ void loop(void)
         digitalWrite(PIN_POWER, HIGH);
       } else if (vcc < 3300) {
         // Warning
-        mode = 3;
+        mode = MODE_LOW_BATTERY;
+        digitalWrite(PIN_LED_RED, LOW);
+        digitalWrite(PIN_LED_GREEN, HIGH);
+        digitalWrite(PIN_LED_BLUE, HIGH);
       }
     }
   }
@@ -222,19 +234,19 @@ void setColour(int val, int* rgb)
   float mapped = 1.0;
 
   switch (mode) {
-    case 0: // Hue (0-360 degrees)
+    case MODE_HUE: // Hue (0-360 degrees)
       hsi2rgb((float) tmp, saturation, intensity, rgb);
       // Store in the global for use in the other modes.
       hue = tmp;
       break;
-    case 1: // Saturation (0 - 1)
+    case MODE_SATURATION: // Saturation (0 - 1)
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, mapped, intensity, rgb);
       // Store in the global for use in the other modes.
       saturation = tmp;
       break;
-    case 2: // Intensity (0 - 1)
+    case MODE_INTENSITY: // Intensity (0 - 1)
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, saturation, mapped, rgb);
