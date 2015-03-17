@@ -138,9 +138,12 @@ void loop(void)
 {
   int rgb[3] = {0, 0, 0};
 
-  static unsigned long mode_last = 0;
   static unsigned long battery_warning_last = 0;
   static int last_enc_count = 0;
+
+  // http://www.labbookpages.co.uk/electronics/debounce.html
+  static uint8_t debounce_switches[3] = {0XFF, 0xFF, 0xFF};
+  static unsigned long debounce_sample_last = 0;
 
 
 
@@ -181,23 +184,43 @@ void loop(void)
   if (mode == MODE_LOW_BATTERY) {
 
     if (now - battery_warning_last > 250) {
-      batter_warning_last = now;
+      battery_warning_last = now;
       // blink
       digitalWrite(PIN_LED_RED, !digitalRead(PIN_LED_RED));
     }
 
   } else {
 
-    // Debounce, then set the mode.
-    if (now - mode_last > 50) {
-      if (digitalRead(PIN_SWITCH_A)) {
-        mode_last = now;
+    // Poll the switches for setting the mode.
+    if (now - debounce_sample_last > 2) {
+      // Debounce, then set the mode.
+      debounce_sample_last = now;
+
+      uint8_t port_c = PINC;
+
+      // Shift the variable towards the most significant bit
+      debounce_switches[0] << 1;
+      // Set the least significant bit to the current switch value
+      //bitWrite(debounce_switches[0], 0, digitalRead(PIN_SWITCH_A));
+      bitWrite(debounce_switches[0], 0, bitRead(port_c, PINC2));
+
+      // Shift the variable towards the most significant bit
+      debounce_switches[1] << 1;
+      // Set the least significant bit to the current switch value
+      //bitWrite(debounce_switches[1], 0, digitalRead(PIN_SWITCH_A));
+      bitWrite(debounce_switches[1], 0, bitRead(port_c, PINC3));
+
+      // Shift the variable towards the most significant bit
+      debounce_switches[2] << 1;
+      // Set the least significant bit to the current switch value
+      //bitWrite(debounce_switches[1], 0, digitalRead(PIN_SWITCH_A));
+      bitWrite(debounce_switches[2], 0, bitRead(port_c, PINC4));
+
+      if (debounce_switches[0] == 0) {
         mode = MODE_HUE;
-      } else if (digitalRead(PIN_SWITCH_B)) {
-        mode_last = now;
+      } else if (debounce_switches[1] == 0) {
         mode = MODE_SATURATION;
-      } else if (digitalRead(PIN_SWITCH_C)) {
-        mode_last = now;
+      } else if (debounce_switches[2] == 0) {
         mode = MODE_INTENSITY;
       }
     }
