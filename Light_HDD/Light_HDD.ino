@@ -10,6 +10,9 @@
 
 */
 
+#include <avr/sleep.h>    // Sleep Modes
+#include <avr/power.h>    // Power management
+
 // Whether serial out put should be created & sent to Processing
 #define PROCESSING 1
 
@@ -69,8 +72,6 @@ uint16_t msg_id = 0;
 // @see http://blog.saikoled.com/post/43693602826/why-every-led-light-should-be-using-hsi
 int8_t mode = MODE_HUE;
 
-unsigned long battery_last_check = 0;
-int8_t battery_reading = 0;
 long vcc = 0;
 float hue = 0.0;
 float saturation = 1.0;
@@ -128,6 +129,7 @@ void loop(void)
 {
   int rgb[3] = {0, 0, 0};
 
+  static unsigned long battery_last_check = 0;
   static unsigned long battery_warning_last = 0;
   static int last_enc_count = 0;
 
@@ -212,25 +214,25 @@ void loop(void)
       }
     }
 
-    // Check the battery level (non blocking)
-    if (now - battery_last_check > BATTERY_CHECK_TIME) {
-      battery_last_check = now;
-      battery_reading = 1;
-      batteryStartReading();
-    } else if (battery_reading == 1) {
-      if (batteryReadComplete()) {
-        battery_reading = 0;
-        vcc = batteryRead();
-        if (vcc < 3300) {
-          // Warning
-          mode = MODE_LOW_BATTERY;
-          digitalWrite(PIN_LED_RED, LOW);
-          digitalWrite(PIN_LED_GREEN, HIGH);
-          digitalWrite(PIN_LED_BLUE, HIGH);
-        }
-      }
-    }
+  }
 
+  // Check the battery level (non blocking)
+  if (now - battery_last_check > BATTERY_CHECK_TIME) {
+    battery_last_check = now;
+    batteryStartReading();
+  } else if (batteryReadComplete()) {
+    vcc = batteryRead();
+    if (vcc < 3200) {
+      // Go into permanent sleep
+      // to draw as little power as possible
+      powerDown();
+    } else if (vcc < 3300) {
+      // Warning
+      mode = MODE_LOW_BATTERY;
+      digitalWrite(PIN_LED_RED, LOW);
+      digitalWrite(PIN_LED_GREEN, HIGH);
+      digitalWrite(PIN_LED_BLUE, HIGH);
+    }
   }
 
 }
@@ -402,6 +404,25 @@ void hsi2rgb(float H, float S, float I, int* rgb) {
   rgb[1]=g;
   rgb[2]=b;
 }
+
+/**
+ * Sleep and do not wake untill reset.
+ */
+void powerDown()
+{
+  noInterrupts();
+  power_all_disable();
+  sleep_enable();
+
+  // turn off brown-out enable in software
+  MCUCR = bit (BODS) | bit (BODSE);  // turn on brown-out enable select
+  MCUCR = bit (BODS);        // this must be done within 4 clock cycles of above
+
+  sleep_cpu();              // sleep within 3 clock cycles of brown out
+
+  // Do not wake, unless reset / power cycled
+}
+
 
 /**
  * Battery power management funtions
