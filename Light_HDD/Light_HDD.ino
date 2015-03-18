@@ -46,7 +46,6 @@
 #define PIN_SWITCH_A 16 // A2 (PC2 - PCINT10)
 #define PIN_SWITCH_B 17 // A3 (PC3 - PCINT11)
 #define PIN_SWITCH_C 18 // A4 (PC4 - PCINT12)
-#define PIN_POWER 4 // Must be low for power to flow (PNP)
 
 #define BATTERY_CHECK_TIME 30000 // How often to check the battery level
 
@@ -68,11 +67,7 @@ uint16_t msg_id = 0;
 
 // HSI colour space
 // @see http://blog.saikoled.com/post/43693602826/why-every-led-light-should-be-using-hsi
-int8_t mode = 0;
-// 0 = Hue
-// 1 = Saturation
-// 2 = Intensity
-// 3 = Warning battery low!
+int8_t mode = MODE_HUE;
 
 unsigned long battery_last_check = 0;
 int8_t battery_reading = 0;
@@ -86,11 +81,6 @@ volatile byte enc_ab = 0; // The previous & current reading
 
 void setup()
 {
-  // Pull the PNP base low to keep the power on
-  // This must happen before the capacitor is full and starts blocking
-  pinMode(PIN_POWER, OUTPUT);
-  digitalWrite(PIN_POWER, LOW);
-
   // Setup encoder pins as inputs with pull up resistor
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
@@ -145,40 +135,6 @@ void loop(void)
   static uint8_t debounce_switches[3] = {0XFF, 0xFF, 0xFF};
   static unsigned long debounce_sample_last = 0;
 
-
-
-  if (mode != MODE_LOW_BATTERY && last_enc_count != enc_counter) {
-    last_enc_count = enc_counter;
-
-    // Set the new colour
-    int val = enc_counter;
-    setColour(val, rgb);
-    showColour(rgb[0], rgb[1], rgb[2]);
-
-    if (PROCESSING) {
-      Serial.println(enc_counter, DEC);
-    }
-
-    if (RADIO) {
-      // Prepare the message.
-      Nrf24Payload tx_payload = Nrf24Payload();
-      tx_payload.setDeviceId(DEVICE_ID);
-      tx_payload.setType('l'); // light command
-      tx_payload.setId(msg_id++);
-      tx_payload.setA(rgb[0]);
-      tx_payload.setB(rgb[1]);
-      tx_payload.setC(rgb[2]);
-      tx_payload.setVcc(vcc);
-      uint8_t tx_buffer[Nrf24Payload_SIZE];
-      tx_payload.serialize(tx_buffer);
-      if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
-        // no ack
-      }
-    }
-
-  }
-
-  // Check mode switch
   unsigned long now = millis();
 
   if (mode == MODE_LOW_BATTERY) {
@@ -190,6 +146,37 @@ void loop(void)
     }
 
   } else {
+
+    if (last_enc_count != enc_counter) {
+      last_enc_count = enc_counter;
+
+      // Set the new colour
+      int val = enc_counter;
+      setColour(val, rgb);
+      showColour(rgb[0], rgb[1], rgb[2]);
+
+      if (PROCESSING) {
+        Serial.println(enc_counter, DEC);
+      }
+
+      if (RADIO) {
+        // Prepare the message.
+        Nrf24Payload tx_payload = Nrf24Payload();
+        tx_payload.setDeviceId(DEVICE_ID);
+        tx_payload.setType('l'); // light command
+        tx_payload.setId(msg_id++);
+        tx_payload.setA(rgb[0]);
+        tx_payload.setB(rgb[1]);
+        tx_payload.setC(rgb[2]);
+        tx_payload.setVcc(vcc);
+        uint8_t tx_buffer[Nrf24Payload_SIZE];
+        tx_payload.serialize(tx_buffer);
+        if (!radio.write( &tx_buffer, Nrf24Payload_SIZE)) {
+          // no ack
+        }
+      }
+
+    }
 
     // Poll the switches for setting the mode.
     if (now - debounce_sample_last > 2) {
@@ -225,28 +212,25 @@ void loop(void)
       }
     }
 
-  }
-
-  // Check the battery level (non blocking)
-  if (now - battery_last_check > BATTERY_CHECK_TIME) {
-    battery_last_check = now;
-    battery_reading = 1;
-    batteryStartReading();
-  } else if (battery_reading == 1) {
-    if (batteryReadComplete()) {
-      battery_reading = 0;
-      vcc = batteryRead();
-      if (vcc < 3200) {
-        // Save the battery from over discharge, turn off now
-        digitalWrite(PIN_POWER, HIGH);
-      } else if (vcc < 3300) {
-        // Warning
-        mode = MODE_LOW_BATTERY;
-        digitalWrite(PIN_LED_RED, LOW);
-        digitalWrite(PIN_LED_GREEN, HIGH);
-        digitalWrite(PIN_LED_BLUE, HIGH);
+    // Check the battery level (non blocking)
+    if (now - battery_last_check > BATTERY_CHECK_TIME) {
+      battery_last_check = now;
+      battery_reading = 1;
+      batteryStartReading();
+    } else if (battery_reading == 1) {
+      if (batteryReadComplete()) {
+        battery_reading = 0;
+        vcc = batteryRead();
+        if (vcc < 3300) {
+          // Warning
+          mode = MODE_LOW_BATTERY;
+          digitalWrite(PIN_LED_RED, LOW);
+          digitalWrite(PIN_LED_GREEN, HIGH);
+          digitalWrite(PIN_LED_BLUE, HIGH);
+        }
       }
     }
+
   }
 
 }
