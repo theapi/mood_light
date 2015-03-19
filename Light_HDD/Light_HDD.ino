@@ -92,9 +92,9 @@ void setup()
   pinMode(PIN_LED_BLUE, OUTPUT);
 
   // common anode, ensure leds are off
-  digitalWrite(PIN_LED_RED, HIGH);
-  digitalWrite(PIN_LED_GREEN, HIGH);
-  digitalWrite(PIN_LED_BLUE, HIGH);
+  digitalWrite(PIN_LED_RED, LOW);
+  digitalWrite(PIN_LED_GREEN, LOW);
+  digitalWrite(PIN_LED_BLUE, LOW);
 
   // Switches to change modes as input
   pinMode(PIN_SWITCH_A, INPUT);
@@ -222,11 +222,14 @@ void loop(void)
     batteryStartReading();
   } else if (batteryReadComplete()) {
     vcc = batteryRead();
-    if (vcc < 3200) {
+    if (vcc < 3000) {
       // Go into permanent sleep
       // to draw as little power as possible
+      digitalWrite(PIN_LED_RED, HIGH);
+      digitalWrite(PIN_LED_GREEN, HIGH);
+      digitalWrite(PIN_LED_BLUE, HIGH);
       powerDown();
-    } else if (vcc < 3300) {
+    } else if (vcc < 3200) {
       // Warning
       mode = MODE_LOW_BATTERY;
       digitalWrite(PIN_LED_RED, LOW);
