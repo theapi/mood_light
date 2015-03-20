@@ -104,6 +104,9 @@ void setup()
   // Listen to the encoder with interrupts
   setupPinInterrupt();
 
+  // Ensure twi is not wasting power
+  power_twi_disable();
+
   // Turn on ADC to monitor the battery level
   batteryAdcOn();
 
@@ -148,6 +151,23 @@ void loop(void)
     }
 
   } else {
+
+    // Check the battery level (non blocking)
+    if (now - battery_last_check > BATTERY_CHECK_TIME) {
+      battery_last_check = now;
+      batteryStartReading();
+    }
+
+    if (batteryReadComplete()) {
+      vcc = batteryRead();
+      if (vcc < 3250) {
+        // Warning
+        mode = MODE_LOW_BATTERY;
+        digitalWrite(PIN_LED_RED, LOW);
+        digitalWrite(PIN_LED_GREEN, HIGH);
+        digitalWrite(PIN_LED_BLUE, HIGH);
+      }
+    }
 
     if (last_enc_count != enc_counter) {
       last_enc_count = enc_counter;
@@ -216,27 +236,7 @@ void loop(void)
 
   }
 
-  // Check the battery level (non blocking)
-  if (now - battery_last_check > BATTERY_CHECK_TIME) {
-    battery_last_check = now;
-    batteryStartReading();
-  } else if (batteryReadComplete()) {
-    vcc = batteryRead();
-    if (vcc < 3000) {
-      // Go into permanent sleep
-      // to draw as little power as possible
-      digitalWrite(PIN_LED_RED, HIGH);
-      digitalWrite(PIN_LED_GREEN, HIGH);
-      digitalWrite(PIN_LED_BLUE, HIGH);
-      powerDown();
-    } else if (vcc < 3200) {
-      // Warning
-      mode = MODE_LOW_BATTERY;
-      digitalWrite(PIN_LED_RED, LOW);
-      digitalWrite(PIN_LED_GREEN, HIGH);
-      digitalWrite(PIN_LED_BLUE, HIGH);
-    }
-  }
+
 
 }
 
@@ -413,17 +413,15 @@ void hsi2rgb(float H, float S, float I, int* rgb) {
  */
 void powerDown()
 {
-  noInterrupts();
-  power_all_disable();
-  sleep_enable();
 
-  // turn off brown-out enable in software
-  MCUCR = bit (BODS) | bit (BODSE);  // turn on brown-out enable select
-  MCUCR = bit (BODS);        // this must be done within 4 clock cycles of above
+  if (RADIO) {
+    // Turn on the nrf24 radio
+    radio.powerDown();
+  }
 
-  sleep_cpu();              // sleep within 3 clock cycles of brown out
+  power_adc_disable();
+  power_spi_disable();
 
-  // Do not wake, unless reset / power cycled
 }
 
 
