@@ -49,6 +49,7 @@
 #define PIN_SWITCH_A 16 // A2 (PC2 - PCINT10)
 #define PIN_SWITCH_B 17 // A3 (PC3 - PCINT11)
 #define PIN_SWITCH_C 18 // A4 (PC4 - PCINT12)
+#define PIN_POWER 4 // Must be kept up to stay on
 
 #define BATTERY_CHECK_TIME 30000 // How often to check the battery level
 
@@ -82,6 +83,11 @@ volatile byte enc_ab = 0; // The previous & current reading
 
 void setup()
 {
+  // @todo Watchdog to ensure power on only when working properly
+  // Take over from the manual push button to keep on
+  pinMode(PIN_POWER, OUTPUT);
+  digitalWrite(PIN_POWER, HIGH);
+  
   // Setup encoder pins as inputs with pull up resistor
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
@@ -97,9 +103,9 @@ void setup()
   digitalWrite(PIN_LED_BLUE, LOW);
 
   // Switches to change modes as input
-  pinMode(PIN_SWITCH_A, INPUT);
-  pinMode(PIN_SWITCH_B, INPUT);
-  pinMode(PIN_SWITCH_C, INPUT);
+  pinMode(PIN_SWITCH_A, INPUT_PULLUP);
+  pinMode(PIN_SWITCH_B, INPUT_PULLUP);
+  pinMode(PIN_SWITCH_C, INPUT_PULLUP);
 
   // Listen to the encoder with interrupts
   setupPinInterrupt();
@@ -142,6 +148,27 @@ void loop(void)
 
   unsigned long now = millis();
 
+
+  // Check the battery level (non blocking)
+  if (now - battery_last_check > BATTERY_CHECK_TIME) {
+    battery_last_check = now;
+    batteryStartReading();
+  }
+
+  if (batteryReadComplete()) {
+    vcc = batteryRead();
+    if (vcc < 3250) {
+      // Turn off the N channel mosfet
+      digitalWrite(PIN_POWER, LOW);
+    } else if (vcc < 3600) {
+      // Warning
+      mode = MODE_LOW_BATTERY;
+      digitalWrite(PIN_LED_RED, LOW);
+      digitalWrite(PIN_LED_GREEN, HIGH);
+      digitalWrite(PIN_LED_BLUE, HIGH);
+    }
+  }
+
   if (mode == MODE_LOW_BATTERY) {
 
     if (now - battery_warning_last > 250) {
@@ -151,23 +178,6 @@ void loop(void)
     }
 
   } else {
-
-    // Check the battery level (non blocking)
-    if (now - battery_last_check > BATTERY_CHECK_TIME) {
-      battery_last_check = now;
-      batteryStartReading();
-    }
-
-    if (batteryReadComplete()) {
-      vcc = batteryRead();
-      if (vcc < 3250) {
-        // Warning
-        mode = MODE_LOW_BATTERY;
-        digitalWrite(PIN_LED_RED, LOW);
-        digitalWrite(PIN_LED_GREEN, HIGH);
-        digitalWrite(PIN_LED_BLUE, HIGH);
-      }
-    }
 
     if (last_enc_count != enc_counter) {
       last_enc_count = enc_counter;
