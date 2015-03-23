@@ -62,7 +62,6 @@ RF24 radio(PIN_CE, PIN_CSN);
 Nrf24Payload rx_payload = Nrf24Payload();
 uint8_t rx[Nrf24Payload_SIZE];
 
-
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
@@ -82,7 +81,6 @@ volatile byte enc_ab = 0; // The previous & current reading
 
 void setup()
 {
-
   // Setup encoder pins as inputs with pull up resistor
   pinMode(ENC_A, INPUT_PULLUP);
   pinMode(ENC_B, INPUT_PULLUP);
@@ -138,11 +136,10 @@ void loop(void)
   static int last_enc_count = 0;
 
   // http://www.labbookpages.co.uk/electronics/debounce.html
-  static uint8_t debounce_switches[3] = {0XFF, 0xFF, 0xFF};
+  static uint8_t debounce_switches[3] = {0xFF, 0xFF, 0xFF};
   static unsigned long debounce_sample_last = 0;
 
   unsigned long now = millis();
-
 
   if (mode == MODE_LOW_BATTERY) {
 
@@ -237,8 +234,6 @@ void loop(void)
     }
 
   }
-
-
 
 }
 
