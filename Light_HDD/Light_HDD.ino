@@ -172,6 +172,8 @@ void loop(void)
 
       // Set the new colour
       int val = enc_counter;
+      // divide by 2 to require more turning to change the colour
+      val = val >> 1;
       setColour(val, rgb);
       showColour(rgb[0], rgb[1], rgb[2]);
 
