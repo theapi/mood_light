@@ -41,8 +41,8 @@
 
 #include <Nrf24Payload.h>
 
-#define PIN_CE  7
-#define PIN_CSN 8
+#define PIN_CE  9
+#define PIN_CSN 10
 #define PIN_LED_RED 3
 #define PIN_LED_GREEN 5
 #define PIN_LED_BLUE 6
@@ -61,7 +61,6 @@ RF24 radio(PIN_CE, PIN_CSN);
 
 Nrf24Payload rx_payload = Nrf24Payload();
 uint8_t rx[Nrf24Payload_SIZE];
-
 // The address that this node listens on
 byte address[6] = RX_ADDRESS;
 byte address_base[6] = BASE_ADDRESS;
