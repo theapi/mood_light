@@ -75,6 +75,10 @@ float hue = 0.0;
 float saturation = 1.0;
 float intensity = 1.0;
 
+int counter_hue = 0;
+int counter_saturation = 360;
+int counter_intensity = 360;
+
 volatile int enc_counter = 0; // changed by encoder input
 volatile byte enc_ab = 0; // The previous & current reading
 
@@ -172,13 +176,27 @@ void loop(void)
 
       // Set the new colour
       int val = enc_counter;
-      // divide by 2 to require more turning to change the colour
-      val = val >> 1;
+
       setColour(val, rgb);
       showColour(rgb[0], rgb[1], rgb[2]);
 
       if (PROCESSING) {
         Serial.println(enc_counter, DEC);
+        /*
+        Serial.print(hue); Serial.print("/");
+        Serial.print(counter_hue); Serial.print(" : ");
+        
+        Serial.print(saturation); Serial.print("/");
+        Serial.print(counter_saturation); Serial.print(" : ");
+        
+        Serial.print(intensity); Serial.print("/");
+        Serial.print(counter_intensity); Serial.print(" - ");
+        
+        Serial.print(rgb[0]); Serial.print(" : ");
+        Serial.print(rgb[1]); Serial.print(" : ");
+        Serial.print(rgb[2]); Serial.print(" : ");
+        Serial.println("");
+        */
       }
 
       if (RADIO) {
@@ -201,37 +219,63 @@ void loop(void)
     }
 
     // Poll the switches for setting the mode.
-    if (now - debounce_sample_last > 2) {
+    if (now - debounce_sample_last > 5) {
       // Debounce, then set the mode.
       debounce_sample_last = now;
-
+      // Read all the switch pins at once.
       uint8_t port_c = PINC;
+      // Store the current mode to see if it changes.
+      int8_t mode_current = mode;
 
       // Shift the variable towards the most significant bit
-      debounce_switches[0] << 1;
+      debounce_switches[0] <<= 1;
       // Set the least significant bit to the current switch value
       //bitWrite(debounce_switches[0], 0, digitalRead(PIN_SWITCH_A));
       bitWrite(debounce_switches[0], 0, bitRead(port_c, PINC2));
 
       // Shift the variable towards the most significant bit
-      debounce_switches[1] << 1;
+      debounce_switches[1] <<= 1;
       // Set the least significant bit to the current switch value
       //bitWrite(debounce_switches[1], 0, digitalRead(PIN_SWITCH_A));
       bitWrite(debounce_switches[1], 0, bitRead(port_c, PINC3));
 
       // Shift the variable towards the most significant bit
-      debounce_switches[2] << 1;
+      debounce_switches[2] <<= 1;
       // Set the least significant bit to the current switch value
       //bitWrite(debounce_switches[1], 0, digitalRead(PIN_SWITCH_A));
       bitWrite(debounce_switches[2], 0, bitRead(port_c, PINC4));
 
-      if (debounce_switches[0] == 0) {
+      if (debounce_switches[2] == 0) {
         mode = MODE_HUE;
       } else if (debounce_switches[1] == 0) {
         mode = MODE_SATURATION;
-      } else if (debounce_switches[2] == 0) {
+      } else if (debounce_switches[0] == 0) {
         mode = MODE_INTENSITY;
       }
+      
+      if (mode_current != mode) {
+        // Reset the counter.
+        switch (mode) {
+          case MODE_HUE:
+            enc_counter = counter_hue;
+            break; 
+          case MODE_SATURATION:
+            enc_counter = counter_saturation;
+            break;
+          case MODE_INTENSITY:
+            enc_counter = counter_intensity;
+            break;
+        }
+      }
+      
+      /*
+      if (PROCESSING) {
+        Serial.print(debounce_switches[0], BIN); Serial.print(" : ");
+        Serial.print(debounce_switches[1], BIN); Serial.print(" : ");
+        Serial.print(debounce_switches[2], BIN); Serial.print(" : ");
+        Serial.println("");
+      }
+      */
     }
 
   }
@@ -240,7 +284,10 @@ void loop(void)
 
 void setColour(int val, int* rgb)
 {
-  float tmp = (float) abs(val);
+  // divide by 2 to require more turning to change the colour
+  int reduced = val >> 1;
+  
+  float tmp = (float) abs(reduced);
   float mapped = 1.0;
 
   switch (mode) {
@@ -248,20 +295,23 @@ void setColour(int val, int* rgb)
       hsi2rgb((float) tmp, saturation, intensity, rgb);
       // Store in the global for use in the other modes.
       hue = tmp;
+      counter_hue = val;
       break;
     case MODE_SATURATION: // Saturation (0 - 1)
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, mapped, intensity, rgb);
       // Store in the global for use in the other modes.
-      saturation = tmp;
+      saturation = mapped;
+      counter_saturation = val;
       break;
     case MODE_INTENSITY: // Intensity (0 - 1)
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, saturation, mapped, rgb);
       // Store in the global for use in the other modes.
-      intensity = tmp;
+      intensity = mapped;
+      counter_intensity = val;
       break;
   }
 }
