@@ -183,13 +183,13 @@ void loop(void)
       if (PROCESSING) {
         Serial.println(enc_counter, DEC);
         /*
-        Serial.print(hue); Serial.print("/");
+        Serial.print("H:"); Serial.print(hue); Serial.print("/");
         Serial.print(counter_hue); Serial.print(" : ");
         
-        Serial.print(saturation); Serial.print("/");
+        Serial.print("S:"); Serial.print(saturation); Serial.print("/");
         Serial.print(counter_saturation); Serial.print(" : ");
         
-        Serial.print(intensity); Serial.print("/");
+        Serial.print("I:"); Serial.print(intensity); Serial.print("/");
         Serial.print(counter_intensity); Serial.print(" - ");
         
         Serial.print(rgb[0]); Serial.print(" : ");
@@ -247,9 +247,9 @@ void loop(void)
 
       if (debounce_switches[2] == 0) {
         mode = MODE_HUE;
-      } else if (debounce_switches[1] == 0) {
-        mode = MODE_SATURATION;
       } else if (debounce_switches[0] == 0) {
+        mode = MODE_SATURATION;
+      } else if (debounce_switches[1] == 0) {
         mode = MODE_INTENSITY;
       }
       
@@ -292,26 +292,44 @@ void setColour(int val, int* rgb)
 
   switch (mode) {
     case MODE_HUE: // Hue (0-360 degrees)
+    
+      
+    
       hsi2rgb((float) tmp, saturation, intensity, rgb);
       // Store in the global for use in the other modes.
       hue = tmp;
       counter_hue = val;
       break;
     case MODE_SATURATION: // Saturation (0 - 1)
+      if (val < 0) {
+        val = 0;
+      } else if (val > 360) {
+        val = 360;
+      }
+      tmp = (float) val;
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, mapped, intensity, rgb);
       // Store in the global for use in the other modes.
       saturation = mapped;
       counter_saturation = val;
+      enc_counter = val;
       break;
     case MODE_INTENSITY: // Intensity (0 - 1)
+      if (val < 0) {
+        val = 0;
+      } else if (val > 360) {
+        val = 360;
+      }
+      tmp = (float) val;
+ 
       // float version of map(val, 0, 360, 0, 1)
       mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
       hsi2rgb(hue, saturation, mapped, rgb);
       // Store in the global for use in the other modes.
       intensity = mapped;
       counter_intensity = val;
+      enc_counter = val;
       break;
   }
 }
