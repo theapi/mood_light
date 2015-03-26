@@ -185,13 +185,13 @@ void loop(void)
         /*
         Serial.print("H:"); Serial.print(hue); Serial.print("/");
         Serial.print(counter_hue); Serial.print(" : ");
-        
+
         Serial.print("S:"); Serial.print(saturation); Serial.print("/");
         Serial.print(counter_saturation); Serial.print(" : ");
-        
+
         Serial.print("I:"); Serial.print(intensity); Serial.print("/");
         Serial.print(counter_intensity); Serial.print(" - ");
-        
+
         Serial.print(rgb[0]); Serial.print(" : ");
         Serial.print(rgb[1]); Serial.print(" : ");
         Serial.print(rgb[2]); Serial.print(" : ");
@@ -252,13 +252,13 @@ void loop(void)
       } else if (debounce_switches[1] == 0) {
         mode = MODE_INTENSITY;
       }
-      
+
       if (mode_current != mode) {
         // Reset the counter.
         switch (mode) {
           case MODE_HUE:
             enc_counter = counter_hue;
-            break; 
+            break;
           case MODE_SATURATION:
             enc_counter = counter_saturation;
             break;
@@ -267,7 +267,7 @@ void loop(void)
             break;
         }
       }
-      
+
       /*
       if (PROCESSING) {
         Serial.print(debounce_switches[0], BIN); Serial.print(" : ");
@@ -284,60 +284,70 @@ void loop(void)
 
 void setColour(int val, int* rgb)
 {
-  // divide by 2 to require more turning to change the colour
-  int reduced = val >> 1;
-  
-  float tmp = (float) abs(reduced);
-  float mapped = 1.0;
+  float tmp;
+  float mapped;
 
   switch (mode) {
     case MODE_HUE: // Hue (0-360 degrees)
-    
-      
-    
-      hsi2rgb((float) tmp, saturation, intensity, rgb);
+
+      // divide by 2 (val >> 1) to require more turning to change the colour
+      hsi2rgb((float) (val >> 1), saturation, intensity, rgb);
       // Store in the global for use in the other modes.
       hue = tmp;
       counter_hue = val;
+
       break;
     case MODE_SATURATION: // Saturation (0 - 1)
+
       if (val < 0) {
         val = 0;
       } else if (val > 360) {
         val = 360;
       }
       tmp = (float) val;
-      // float version of map(val, 0, 360, 0, 1)
-      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
+      // float version of map()
+      mapped = mapf(val, 0, 360, 0, 1);
       hsi2rgb(hue, mapped, intensity, rgb);
       // Store in the global for use in the other modes.
       saturation = mapped;
       counter_saturation = val;
       enc_counter = val;
+
       break;
     case MODE_INTENSITY: // Intensity (0 - 1)
+
       if (val < 0) {
         val = 0;
       } else if (val > 360) {
         val = 360;
       }
       tmp = (float) val;
- 
-      // float version of map(val, 0, 360, 0, 1)
-      mapped = (tmp - 0.0) * (1.0 - 0.0) / (360.0 - 0.0);
+
+      // float version of map()
+      mapped = mapf(val, 0, 360, 0, 1);
       hsi2rgb(hue, saturation, mapped, rgb);
       // Store in the global for use in the other modes.
       intensity = mapped;
       counter_intensity = val;
       enc_counter = val;
+
       break;
   }
 }
 
 /**
+ * Float version of map(val, 0, 360, 0, 1)
+ */
+float mapf(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+/**
  * Show the colour on the local led (common anode)
  */
-void showColour(byte r, byte g, byte b) {
+void showColour(byte r, byte g, byte b)
+{
   analogWrite(PIN_LED_RED, map(r, 0, 255, 255, 0));
   analogWrite(PIN_LED_GREEN, map(g, 0, 255, 255, 0));
   analogWrite(PIN_LED_BLUE, map(b, 0, 255, 255, 0));
